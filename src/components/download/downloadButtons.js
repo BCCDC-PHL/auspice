@@ -23,18 +23,6 @@ export const DownloadButtons = ({dispatch, t, tree, entropy, metadata, colorBy, 
   const filePrefix = getFilePrefix();
   const temporal = distanceMeasure === "num_date";
 
-  /* set gisaidProvenance based on supplied JSON metadata */
-  let gisaidProvenance = false;
-  if ("dataProvenance" in metadata) {
-    for (const source of metadata.dataProvenance) {
-      if ("name" in source) {
-        if (source.name.toUpperCase() === "GISAID") {
-          gisaidProvenance = true;
-        }
-      }
-    }
-  }
-
   return (
     <>
       <div style={{fontWeight: 500, marginTop: "0px", marginBottom: "20px"}}>
@@ -55,22 +43,19 @@ export const DownloadButtons = ({dispatch, t, tree, entropy, metadata, colorBy, 
         icon={<RectangularTreeIcon width={iconWidth} selected />}
         onClick={() => helpers.exportTree({dispatch, filePrefix, tree, colorings: metadata.colorings, colorBy, temporal})}
       />
-      {gisaidProvenance && (
-        <Button
-          name="Acknowledgments (TSV)"
-          description={`Per-sample acknowledgments (n = ${selectedTipsCount}).`}
-          icon={<MetaIcon width={iconWidth} selected />}
-          onClick={() => helpers.acknowledgmentsTSV(dispatch, filePrefix, tree.nodes, metadata.colorings, tree.visibility)}
-        />
-      )}
-      {!gisaidProvenance && (
-        <Button
-          name="Metadata (TSV)"
-          description={`Per-sample metadata (n = ${selectedTipsCount}).`}
-          icon={<MetaIcon width={iconWidth} selected />}
-          onClick={() => helpers.strainTSV(dispatch, filePrefix, tree.nodes, metadata.colorings, tree.visibility)}
-        />
-      )}
+      <Button
+        name="Metadata (TSV)"
+        description={`Per-sample metadata (n = ${selectedTipsCount}).`}
+        icon={<MetaIcon width={iconWidth} selected />}
+        onClick={() => helpers.strainTSV(dispatch, filePrefix, tree.nodes, metadata.colorings, tree.visibility)}
+      />
+
+      <Button 
+        name="Divergence Line Metadata (TSV)"
+        description="Download first mutation line in current view."
+        icon={<MetaIcon width={iconWidth} selected />}
+        onClick={() => helpers.straindivTSV(dispatch, filePrefix, tree.nodes, metadata.colorings, tree.visibility)}
+      />
       {helpers.areAuthorsPresent(tree) && (
         <Button
           name="Author Metadata (TSV)"
