@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import NavBar from "../navBar";
 import Flex from "../../components/framework/flex";
 import { CenterContent } from "./centerContent";
-import { FinePrintStyles, getCitation} from "../../components/framework/fine-print";
+import { FinePrintStyles, getCitation, getCustomFinePrint } from "../../components/framework/fine-print";
 
 const getNumColumns = (width) => width > 1000 ? 3 : width > 750 ? 2 : 1;
 
@@ -46,7 +46,7 @@ const SplashContent = ({available, browserDimensions, dispatch, errorMessage, ch
           alt="logo"
           width="102"
           src={
-            require("../../images/logo-light.svg") // eslint-disable-line global-require
+            require("../../images/logo-light.svg")
           }
         />
       </Flex>
@@ -111,9 +111,8 @@ const SplashContent = ({available, browserDimensions, dispatch, errorMessage, ch
         <ListAvailable type="datasets" data={available.datasets}/>
         <ListAvailable type="narratives" data={available.narratives}/>
         <FinePrintStyles>
-          <Flex className='finePrint'>
-            {getCitation()}
-          </Flex>
+          {getCustomFinePrint()}
+          {getCitation()}
         </FinePrintStyles>
       </div>
     </>

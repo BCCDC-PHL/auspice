@@ -2,53 +2,142 @@ on:
   push:
     branches:
       - master
+      - release
   pull_request:
+  workflow_dispatch:
 name: ci
+
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [14, 16, 18]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version
+      # Build is implicit with the "prepare" life cycle script
+      - run: npm ci
+
   unit-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [10]
+        node: [14, 16, 18]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node }}
       - run: node --version
-      - run: npm ci
+      # Note: --ignore-scripts skips an otherwise unnecessary Auspice build, but
+      # also skips life cycle scripts for dependencies. If the job fails here,
+      # try removing this flag.
+      - run: npm ci --ignore-scripts
       - run: npm test
+
   smoke-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [10]
+        node: [14, 16, 18]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node }}
       - run: npm ci
       - run: npm run get-data
       - run: npm run smoke-test:ci
+
   lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [10]
+        node: [14, 16, 18]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node }}
-      - run: npm install
+      # Note: --ignore-scripts skips an otherwise unnecessary Auspice build, but
+      # also skips life cycle scripts for dependencies. If the job fails here,
+      # try removing this flag.
+      - run: npm ci --ignore-scripts
       - run: npm run lint
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      # Note: --ignore-scripts skips an otherwise unnecessary Auspice build, but
+      # also skips life cycle scripts for dependencies. If the job fails here,
+      # try removing this flag.
+      - run: npm ci --ignore-scripts
+      - run: npm run type-check
+
   bundlesize:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          node-version: 10
-      - run: npm install
-      - run: npx bundlesize
+          node-version: 18
+      - run: npm ci
+      - run: npx --yes bundlesize
+
+  # Ensure package-lock.json is synced with package.json.
+  check-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          # Node.js version doesn't matter; npm version is more important when
+          # it comes to lockfiles.
+          node-version: 18
+      - run: npm install -g npm@8
+      - run: npm install --ignore-scripts
+      - run: |
+          if git diff --exit-code package-lock.json; then
+              echo "package-lock.json is up to date." >&2
+          else
+              echo "package-lock.json needs updating. Please run 'npm install --ignore-scripts' locally and commit the changes." >&2
+              exit 1
+          fi
+
+  publish:
+    if: ${{ github.ref == 'refs/heads/release' }}
+    needs: [build, unit-test, smoke-test, lint, check-lockfile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          registry-url: https://registry.npmjs.org/
+      - run: node --version
+      - run: npm ci
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  rebuild-docker-image:
+    needs: [publish]
+    runs-on: ubuntu-latest
+    steps:
+    - run: gh workflow run ci.yml --repo nextstrain/docker-base
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN_NEXTSTRAIN_BOT_WORKFLOW_DISPATCH }}
+
+  build-docs:
+    uses: nextstrain/.github/.github/workflows/docs-ci.yaml@master
+    with:
+      docs-directory: docs/
+      environment-file: docs/environment.yml

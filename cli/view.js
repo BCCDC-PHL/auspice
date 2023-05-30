@@ -45,7 +45,7 @@ const loadAndAddHandlers = ({app, handlersArg, datasetDir, narrativeDir}) => {
   if (handlersArg) {
     const handlersPath = path.resolve(handlersArg);
     utils.verbose(`Loading handlers from ${handlersPath}`);
-    const inject = require(handlersPath); // eslint-disable-line
+    const inject = require(handlersPath);
     handlers.getAvailable = inject.getAvailable;
     handlers.getDataset = inject.getDataset;
     handlers.getNarrative = inject.getNarrative;
@@ -82,7 +82,7 @@ const getAuspiceBuild = () => {
     cwd !== sourceDir &&
     fs.existsSync(path.join(cwd, "index.html")) &&
     fs.existsSync(path.join(cwd, "dist")) &&
-    fs.readdirSync(path.join(cwd, "dist")).filter((fn) => fn.match(/^auspice.bundle.[a-z0-9]+.js$/)).length === 1
+    fs.readdirSync(path.join(cwd, "dist")).filter((fn) => fn.match(/^auspice.main.bundle.[a-z0-9]+.js$/)).length === 1
   ) {
     return {
       message: "Serving the auspice build which exists in this directory.",

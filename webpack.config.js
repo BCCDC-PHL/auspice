@@ -13,9 +13,6 @@ const LodashModuleReplacementPlugin = require('lodash-webpack-plugin');
 const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyzeBundle=false}) => {
   utils.verbose(`Generating webpack config. Extensions? ${!!extensionPath}. devMode: ${devMode}`);
 
-  /* which directories should be parsed by babel and other loaders? */
-  const directoriesToTransform = [path.join(__dirname, 'src')];
-
   // Pins all react stuff, and uses hot loader's dom (can be used safely in production)
   // Format is either "libName" or "libName:libPath"
   const coreDeps = [
@@ -58,9 +55,10 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
     // console.log("BUILDING WITH EXTENSIONS");
     const dir = path.resolve(__dirname, path.dirname(extensionPath));
     aliasesToResolve["@extensions"] = dir;
-    directoriesToTransform.push(dir);
-    // console.log("directoriesToTransform", directoriesToTransform);
     extensionData = JSON.parse(fs.readFileSync(extensionPath, {encoding: 'utf8'}));
+    if (extensionData.googleAnalyticsKey) {
+      console.log(`DEPRECATION WARNING: your extensions define a Google Analytics key (${extensionData.googleAnalyticsKey}) but GA will be removed from a future release.`);
+    }
     // console.log("extensionData", extensionData);
   }
 
@@ -90,7 +88,6 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
     new LodashModuleReplacementPlugin(),
     new webpack.HotModuleReplacementPlugin(),
     pluginProcessEnvData,
-    new webpack.NoEmitOnErrorsPlugin(),
     pluginHtml,
     cleanWebpackPlugin
   ] : [
@@ -102,7 +99,7 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
   ];
 
   if (analyzeBundle) {
-    const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin; // eslint-disable-line
+    const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
     plugins.push(new BundleAnalyzerPlugin());
   }
 
@@ -125,7 +122,7 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
    * of the big vendor bundle, so we must be sure they're stable both internally
    * and with respect to the implementation.
    * The hashes of the bundles are hardcoded in bundlesize so it will trigger
-   * a check error if it is unadvertently changed.
+   * a check error if it is inadvertently changed.
    */
   const coreVendors = [
     "@babel/runtime",
@@ -149,7 +146,7 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
    * For example d3-.* is here even if it's a core library, because if we
    * include some new d3 feature, the whole bundle will change.
    * The hashes of the bundles are hardcoded in bundlesize so it will trigger
-   * a check error if it is unadvertently changed.
+   * a check error if it is inadvertently changed.
    */
   const bigVendors = [
     "d3-.*", // d3 is imported selectively, new usages may change the bundle
@@ -186,15 +183,17 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
     entry,
     output: {
       path: outputPath,
-      filename: `auspice.bundle${!devMode ? ".[contenthash]" : ""}.js`,
+      filename: `auspice.[name].bundle${!devMode ? ".[contenthash]" : ""}.js`,
       chunkFilename: `auspice.chunk.[name].bundle${!devMode ? ".[chunkhash]" : ""}.js`,
       publicPath: "/dist/"
     },
     resolve: {
-      alias: aliasesToResolve
-    },
-    node: {
-      fs: 'empty'
+      alias: aliasesToResolve,
+      extensions: ['.ts', '.tsx', '...'],
+      fallback: {
+        buffer: require.resolve("buffer/"),
+        fs: false
+      }
     },
     plugins,
     optimization: {
@@ -237,7 +236,7 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
     module: {
       rules: [
         {
-          test: /\.js$/,
+          test: /\.(ts|js)x?$/,
           loader: 'babel-loader',
           exclude: [
             /node_modules\/(core-js|regenerator-runtime)/
@@ -252,7 +251,7 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
         },
         {
           test: /\.(gif|png|jpe?g|svg|woff2?|eot|otf|ttf)$/i,
-          use: "file-loader"
+          type: "asset/resource"
         },
         {
           // esprima is a (large) dependency of js-yaml which is unnecessary in a browser

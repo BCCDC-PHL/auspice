@@ -1,10 +1,228 @@
----
-title: Changelog
----
+# Changelog
+
+## version 2.46.0 - 2023/05/15
+
+
+* Fixed a bug where narratives with multiple datasets that had measurements panels would error when switching datasets. ([#1603](https://github.com/nextstrain/auspice/issues/1603))
+
+_There have been a number of internal changes with this release, most of which should not result in any different behavior while using Auspice._
+
+* Add basic TypeScript support ([#1450](https://github.com/nextstrain/auspice/pull/1450))
+* Minor dev docs updates ([#1660](https://github.com/nextstrain/auspice/pull/1660))
+* Overhaul of ESLint rules ([#1665](https://github.com/nextstrain/auspice/pull/1665))
+
+## version 2.45.2 - 2023/03/22
+
+
+* Fixed a bug for continuous color scales where tips with values of zero wouldn't appear on legend-hover or in the frequencies panel.
+See [PR #1643](https://github.com/nextstrain/auspice/pull/1643) for more.
+* Fixed a bug where downloaded TSVs may have unescaped quotes which resulted in incorrect parsing.
+See [PR #1649](https://github.com/nextstrain/auspice/pull/1649) for more.
+* Minor documentation updates. See [PR #1638](https://github.com/nextstrain/auspice/pull/1638) for more.
+
+## version 2.45.1 - 2023/03/14
+
+* Small improvements to Auspice documentation. ([#1588](https://github.com/nextstrain/auspice/pull/1588))
+
+## version 2.45.0 - 2023/03/08
+
+
+* Remove support for Node.js version 12. ([#1560](https://github.com/nextstrain/auspice/pull/1560))
+* Add support for Node.js version 18 and NPM version 9. ([#1560](https://github.com/nextstrain/auspice/pull/1560))
+
+## version 2.44.0 - 2023/03/02
+
+
+* Added support for [Plausible Analytics](https://plausible.io) and deprecated support for Google Analytics. See the [documentation on configuring analytics](https://docs.nextstrain.org/projects/auspice/en/stable/customise-client/api.html#tracking-analytics). ([#1597](https://github.com/nextstrain/auspice/pull/1597))
+
+## version 2.43.0 - 2023/02/07
+* Improvements to the measurements panel including multiple thresholds, jitter of raw measurements within color-by groups, and a sticky x-axis. See [PR 1631](https://github.com/nextstrain/auspice/pull/1631).
+
+## version 2.42.0 - 2022/12/15
+* You can now turn off tip labels by selecting "none" in the dropdown. See [PR #1618](https://github.com/nextstrain/auspice/pull/1618)
+* A bug in the measurements panel was fixed where the mean/SD may disappear. See [PR #1593](https://github.com/nextstrain/auspice/pull/1593)
+
+_There have been a number of internal changes with this release, most of which should not result in any different behavior while using Auspice._
+
+* Upgraded webpack 4 → 5. See [PR #1520](https://github.com/nextstrain/auspice/pull/1520) for more.
+* Upgraded lockfile to the npm 7/8 format. See [PR #1602](https://github.com/nextstrain/auspice/pull/1602) for more.
+* Webpack cleanups via [PR #1605](https://github.com/nextstrain/auspice/pull/1605)
+* Documentation autobuilding via [PR #1609](https://github.com/nextstrain/auspice/pull/1609)
+* Spelling fixes ([PR #1619](https://github.com/nextstrain/auspice/pull/1619), [PR #1620](https://github.com/nextstrain/auspice/pull/1620))
+
+## version 2.41.0 - 2022/11/10
+* A narratives debugger has been added at `/edit/narratives`.
+See [PR #1590](https://github.com/nextstrain/auspice/pull/1590) or the new [Narratives Tutorial](https://docs.nextstrain.org/en/latest/tutorials/narratives-how-to-write.html) for more details.
+Note: this functionality will prevent auspice from viewing a _dataset_ JSON named `edit_narratives.json`.
+
+
+## version 2.40.1 - 2022/11/07
+* Fixed a bug where downloaded Newick trees may be empty - often this happens when there is no newick representation for the tree being displayed and in these cases a warning notification is shown. See [PR #1591](https://github.com/nextstrain/auspice/pull/1591) for more.
+* Fixed a bug where branch labels prevented clicking on the underlying branches. See [PR #1584](https://github.com/nextstrain/auspice/pull/1584) for more.
+
+## version 2.40.0 - 2022/10/21
+* Keep the measurements panel's color-by means in a stable order while filtering. See [PR #1566](https://github.com/nextstrain/auspice/pull/1566) for more.
+* Allow setting the "show all branch labels" toggle via the URL query `?showBranchLabels=all`. See [PR #1575](https://github.com/nextstrain/auspice/pull/1575) for more.
+* Fix a bug where ordinal scales wouldn't be colored correctly in the frequency pane. See [Issue #843](https://github.com/nextstrain/auspice/issues/843) and [PR #1578](https://github.com/nextstrain/auspice/pull/1578) for more.
+* The legend can no longer have duplicate entries (both for user provided color scales and for continuous scales), which also prevents the display bug where legend items may be overlapping when switching to a different coloring. See issues [#1521](https://github.com/nextstrain/auspice/issues/1521) and [#1547](https://github.com/nextstrain/auspice/issues/1547), and [PR 1576](https://github.com/nextstrain/auspice/pull/1576).
+* Re-enable temporal confidence bars for trees which include this data. See [PR #1577](https://github.com/nextstrain/auspice/pull/1577) for more.
+
+## version 2.39.0 - 2022/10/06
+* A range of improvements to the measurements panel including reference sera coloring
+and more informative tooltips. See [PR 1557](https://github.com/nextstrain/auspice/pull/1557) for more.
+* Color-by genotype dropdown: nuc (nucleotide) is now the first item in the list.
+See [PR 1550](https://github.com/nextstrain/auspice/pull/1550) for more.
+* Fixed a bug where zooming out one level would instead jump multiple levels.
+See [PR 1552](https://github.com/nextstrain/auspice/pull/1552) for more.
+* Added a toggle to force the display of all branch labels, rather than only those meeting
+a certain threshold. See [PR 1554](https://github.com/nextstrain/auspice/pull/1554) for more.
+* Install documentation updated. See [PR 1551](https://github.com/nextstrain/auspice/pull/1551) for more.
+
+
+## version 2.38.0 - 2022/09/16
+* Mutations now separate out "undeletions" & add information on what the categories represent.
+See [PR 1542](https://github.com/nextstrain/auspice/pull/1542) for more.
+* Bugfix where certain GISAID accessions may cause a crash when clicked.
+See [PR 1531](https://github.com/nextstrain/auspice/pull/1531) for more.
+* Duplicate / missing node names now emit a warning to the console, not an error.
+See [PR 1543](https://github.com/nextstrain/auspice/pull/1543) for more.
+
+#### Internal (Nextstrain-related) changes
+* Documentation theme added. See [PR 1535](https://github.com/nextstrain/auspice/pull/1535) for more.
+* Bioconda rebuild instructions added. See [PR 1539](https://github.com/nextstrain/auspice/pull/1539) for more.
+* Minor docs formatting fixes. See [PR 1533](https://github.com/nextstrain/auspice/pull/1533) for more.
+
+
+## version 2.37.3 - 2022/06/16
+* Allow temporal colour scales.
+See [PR 1523](https://github.com/nextstrain/auspice/pull/1523) for more.
+* Change ordering of sidebar tree options.
+See [PR 1524](https://github.com/nextstrain/auspice/pull/1524) for more.
+* (Docs) Corrected note about CORS.
+See [PR 1525](https://github.com/nextstrain/auspice/pull/1525) for more.
+* (Internal) Automated how we make GitHub releases.
+See [PR 1518](https://github.com/nextstrain/auspice/pull/1518) for more.
+
+## version 2.37.2 - 2022/05/27
+* Allow trees with duplicate node names / missing node names (but raise an error in the console).
+See [PR 1514](https://github.com/nextstrain/auspice/pull/1514) for more.
+* Fix a bug where the right hand side of the tree could disappear.
+See [PR 1513](https://github.com/nextstrain/auspice/pull/1513) for more.
+
+## version 2.37.1 - 2022/05/11
+* Ensure legend colours are exactly the same as the tip colours.
+See [PR 1506](https://github.com/nextstrain/auspice/pull/1506) for more.
+* Always show branch labels if they are the root of a subtree.
+See [PR 1503](https://github.com/nextstrain/auspice/pull/1503) for more.
+* Docs improvements. See [PR 1507](https://github.com/nextstrain/auspice/pull/1507) for more.
+* CI improvements. See [PR 1505](https://github.com/nextstrain/auspice/pull/1505) for more.
+
+## version 2.37.0 - 2022/04/28
+* Improved footer styling of tables.
+See [PR 1502](https://github.com/nextstrain/auspice/pull/1502) for more.
+* Branch labels are now shown/hidden depending according to the proportion of visible tips they define.
+See [PR 1501](https://github.com/nextstrain/auspice/pull/1501) for more.
+
+## version 2.36.0 - 2022/03/28
+
+### Functional improvements
+
+* Dynamically update regression lines to reflect filtered data.
+See [PR 1484](https://github.com/nextstrain/auspice/pull/1484) for more.
+* Scatterplot axes can now use "node-order" which is the order nodes appear on the rectangular tree.
+See [PR 1494](https://github.com/nextstrain/auspice/pull/1494) for more.
+* Show an "experimental" icon and on-hover info text for the explode-tree functionality.
+See [PR 1486](https://github.com/nextstrain/auspice/pull/1486) for more.
+* You can now use the escape key to remove a tip/branch info modal over the tree.
+See [PR 1485](https://github.com/nextstrain/auspice/pull/1485) for more.
+
+### Bugfixes
+
+* Drag-n-drop metadata now works for the second tree.
+See [PR 1489](https://github.com/nextstrain/auspice/pull/1489) for more.
+* Available filters are now correct when switching from a narrative to exploding the data.
+See [PR 1493](https://github.com/nextstrain/auspice/pull/1493) for more.
+* The auspice server only accepts valid sidecar file types.
+See [PR 1495](https://github.com/nextstrain/auspice/pull/1495) for more.
+
+## version 2.35.0 - 2022/03/16
+* Upgrade how we render dropdown menus, which greatly improves the display of long options (e.g. submitting labs).
+See [PR 1482](https://github.com/nextstrain/auspice/pull/1482) for more.
+
+
+## version 2.34.1 - 2022/03/08
+* (Minor change) expose functions for use in auspice.us. See [PR 1478](https://github.com/nextstrain/auspice/pull/1478) for more.
+
+## version 2.34.0 - 2022/03/02
+
+#### Major changes
+* Measurements panel intended for displaying titer or DMS data where a tip in the tree has multiple values associated with it.
+This function requires a dataset with a `_measurements.json` sidecar file
+See [PR 1452](https://github.com/nextstrain/auspice/pull/1452) for more.
+
+#### Minor changes
+* Improved YAML parsing for narratives
+See [PR 1472](https://github.com/nextstrain/auspice/pull/1472) for more.
+* Remove unused properties from tip-frequencies panel.
+See [PR 1471](https://github.com/nextstrain/auspice/pull/1471) for more.
+* Fixed a bug where shift+clicking on branches for trees without mutations defined caused a crash.
+See [PR 1475](https://github.com/nextstrain/auspice/pull/1475) for more.
+
+
+
+## version 2.33.0 - 2022/02/15
+
+* (Experimental) Explode phylogeny into subtrees and allow multiple trees to be provided in the dataset.
+See [PR 1442](https://github.com/nextstrain/auspice/pull/1442) for more.
+* Categorise mutations to better understand sequence changes on branches and tips.
+See [PR 1449](https://github.com/nextstrain/auspice/pull/1449) for more.
+* Add a datepicker to allow precise changes to the selected date range.
+See [PR 1412](https://github.com/nextstrain/auspice/pull/1412) for more.
+* Allow build-time customizable fine print.
+See [PR 1448](https://github.com/nextstrain/auspice/pull/1448) for more.
+* Remove scrollbar in panels when no scrolling is possible
+See [PR 1439](https://github.com/nextstrain/auspice/pull/1439) for more.
+* Allow searching in the color-by dropdown.
+See [PR 1456](https://github.com/nextstrain/auspice/pull/1456) for more.
+
+There have also been internal changes related to how we run CI. These should not affect using Auspice as a library / CLI.
+
+## version 2.32.1 - 2021/11/11
+* Fix URL parsing to allow the string "narratives" to be in a dataset without it being interpreted as a narrative itself.
+See [PR 1428](https://github.com/nextstrain/auspice/pull/1428) for more.
+
+## version 2.32.0 - 2021/10/20
+
+* Tree info boxes are now improved, and you can shift+click on a branch to see more information about that branch.
+See [PR 1420](https://github.com/nextstrain/auspice/pull/1420) for more.
+* Filters in footer are now expandable to improve usability and discoverability of the true footer.
+See [PR 1414](https://github.com/nextstrain/auspice/pull/1414) for more.
+* Fixed a bug with CSV (drag & drop) parsing. See [PR 1401](https://github.com/nextstrain/auspice/pull/1401) for more.
+* Removed unnecessary postinstall step. See [PR 1419](https://github.com/nextstrain/auspice/pull/1419) for more.
+* Improved image sizing in narratives. See [PR 1408](https://github.com/nextstrain/auspice/pull/1408) for more.
+* Improved documentation around how to build auspice documentation!
+
+
+## version 2.31.0 - 2021/09/16
+* Improvements to our ability to zoom out in a tree, both by exposing the root branch and via a new icon next to "Zoom to Selected".
+See [PR 1392](https://github.com/nextstrain/auspice/pull/1392) for more.
+
+## version 2.30.0 - 2021/09/07
+
+* Narratives can now load sidecar files and second trees.
+This allows allowing frequency panel display, colouring by root-sequence, and tanglegrams.
+See [PR 1305](https://github.com/nextstrain/auspice/pull/1305) for more.
+* Excel (`.xlsx`) files can be used as additional metadata for drag-and-drop.
+See [PR 1386](https://github.com/nextstrain/auspice/pull/1386) for more.
+* Trees are now clipped to improve axes visibility.
+See [PR 1383](https://github.com/nextstrain/auspice/pull/1383) for more.
+* Improved accession URL creation.
+See [PR 1382](https://github.com/nextstrain/auspice/pull/1382) for more.
+* minor documentation improvements.
 
 ## version 2.29.1 - 2021/07/16
 
-* Update TravisCI script to improve how we publish Auspice to npm. 
+* Update TravisCI script to improve how we publish Auspice to npm.
 See [PR 1380](https://github.com/nextstrain/auspice/pull/1380) for more.
 
 ## version 2.29.0 - 2021/07/15

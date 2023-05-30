@@ -65,8 +65,8 @@ export const getIdxMatchingLabel = (nodes, labelName, labelValue, dispatch) => {
 * If the node isn't visible, the thickness is 1.
 * Relies on the `tipCount` property of the nodes having been updated.
 * Pure.
-* @param nodes - JSON nodes
-* @param visibility - visibility array (1-1 with nodes)
+* @param {Array<Node>} nodes - JSON nodes
+* @param {Array<Int>} visibility - visibility array (1-1 with nodes)
 * @returns array of thicknesses (numeric)
 */
 const calcBranchThickness = (nodes, visibility) => {
@@ -96,7 +96,7 @@ const makeParentVisible = (visArray, node) => {
 /* Recursively hide nodes that do not have more than one child node by updating
  * the boolean values in the param visArray.
  * Relies on visArray having been updated by `makeParentVisible`
- * Returns the index of the visible commonn ancestor. */
+ * Returns the index of the visible common ancestor. */
 const hideNodesAboveVisibleCommonAncestor = (visArray, node) => {
   if (!node.hasChildren) {
     return node.arrayIdx; // Terminal node without children
@@ -161,7 +161,7 @@ const getFilteredAndIdxOfFilteredRoot = (tree, controls, inView) => {
   });
 
   if (filters.length) {
-    /* find the terminal nodes that were (a) already visibile and (b) match the filters */
+    /* find the terminal nodes that were (a) already visible and (b) match the filters */
     filtered = tree.nodes.map((d, idx) => (
       !d.hasChildren && inView[idx] && filters.every((f) => f.values.includes(getTraitFromNode(d, f.trait)))
     ));
@@ -169,11 +169,11 @@ const getFilteredAndIdxOfFilteredRoot = (tree, controls, inView) => {
       if (e) {a.push(i);}
       return a;
     }, []);
-    /* for each visibile tip, make the parent nodes visible (recursively) */
+    /* for each visible tip, make the parent nodes visible (recursively) */
     for (let i = 0; i < idxsOfFilteredTips.length; i++) {
       makeParentVisible(filtered, tree.nodes[idxsOfFilteredTips[i]]);
     }
-    /* Recursivley hide ancestor nodes that are not the last common
+    /* Recursively hide ancestor nodes that are not the last common
      * ancestor of selected nodes, starting from the root of the tree */
     idxOfFilteredRoot = hideNodesAboveVisibleCommonAncestor(filtered, tree.nodes[0]);
   }
@@ -198,9 +198,9 @@ visibility: array of integers in {0, 1, 2}
 ROUGH DESCRIPTION OF HOW FILTERING IS APPLIED:
  - inView filtering (reflects tree zooming): Nodes which are not inView always have visibility=0
  - time filtering is simple - all nodes (internal + terminal) not within (tmin, tmax) are excluded.
- - filters are a bit more tricky - the visibile tips are calculated, and the parent
-    branches back to the MRCA are considered visibile. This is then intersected with
-    the time & inView visibile stuff
+ - filters are a bit more tricky - the visible tips are calculated, and the parent
+    branches back to the MRCA are considered visible. This is then intersected with
+    the time & inView visible stuff
 */
 export const calcVisibility = (tree, controls, dates, inView, filtered) => {
   if (tree.nodes) {
@@ -250,7 +250,7 @@ export const calculateVisiblityAndBranchThickness = (tree, controls, dates) => {
 };
 
 /**
- * Compute whether each node is filtered (visibile) by any defined genotype filters.
+ * Compute whether each node is filtered (visible) by any defined genotype filters.
  *
  * Idea behind how we check genotype filter matches:
  * A "constellation" is a set of mutations -- for instance, the filters define such a set (see `filterConstellationLong`)
@@ -287,7 +287,7 @@ function performGenotypeFilterMatch(filtered, filters, nodes) {
   // todo: the entropy view is sometimes broken after filtering by genotype, but this shouldn't be the case (we can filter by other traits which are homoplasic and it works)
 
   if (!filtered) { // happens if there are no other filters in play
-    filtered = Array.from({length: nodes.length}, () => true); // eslint-disable-line no-param-reassign
+    filtered = Array.from({length: nodes.length}, () => true);
   }
   const filterConstellationLong = createFilterConstellation(genotypeFilters);
   const nGt = filterConstellationLong.length; // Note: may not be the same as genotypeFilters.length

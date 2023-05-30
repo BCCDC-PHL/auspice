@@ -1,4 +1,5 @@
 /* eslint no-restricted-syntax: 0 */
+import { unparse } from "papaparse";
 import { infoNotification, warningNotification } from "../../actions/notifications";
 import { spaceBetweenTrees } from "../tree/tree";
 import { getTraitFromNode, getDivFromNode, getFullAuthorInfoFromNode, getVaccineFromNode, getAccessionFromNode } from "../../util/treeMiscHelpers";
@@ -6,6 +7,7 @@ import { numericToCalendar } from "../../util/dateHelpers";
 import { NODE_VISIBLE } from "../../util/globals";
 import { datasetSummary } from "../info/datasetSummary";
 import { isColorByGenotype } from "../../util/getGenotype";
+import { EmptyNewickTreeCreated } from "../../util/exceptions";
 
 export const isPaperURLValid = (d) => {
   return (
@@ -36,9 +38,18 @@ const treeToNewick = (tree, temporal, internalNodeNames=false, nodeAnnotation=()
     return leaf;
   }
 
-  const rootNode = tree.nodes[tree.idxOfInViewRootNode];
+  /**
+   * Try the filtered root first as this may be different from the in view root node
+   * We still need to fallback on the idxOfInViewRootNode because the idxOfFilteredRoot
+   * is undefined when there are no filters applied.
+   */
+  const rootNode = tree.nodes[tree.idxOfFilteredRoot || tree.idxOfInViewRootNode];
   const rootXVal = getXVal(rootNode);
-  return recurse(rootNode, rootXVal) + ";";
+  const newickTree = recurse(rootNode, rootXVal);
+  if (!newickTree) {
+    throw new EmptyNewickTreeCreated();
+  }
+  return newickTree + ";";
 };
 
 const MIME = {
@@ -97,6 +108,43 @@ const treeToNexus = (tree, colorings, colorBy, temporal) => {
   ].join("\n");
 };
 
+/**
+ * Create a properly formatted TSV string for given data using Papa.unparse().
+ *
+ * Each object within the data array should represent a single row in the
+ * TSV string. All values of the object will be converted to their string
+ * representation via `toString` within unparse
+ * (see https://github.com/mholt/PapaParse/blame/824bbd9daf17168bddfc5485066771453cab423e/papaparse.js#L464).
+ *
+ * The optional columns parameter allows you to specify the specific keys to
+ * use as columns in the TSV string. Note, order of column names will
+ * determine order of output columns in the TSV string.
+ *
+ * If columns are not specified, then parser will use the keys of the first
+ * Object in the data array as the columns for the TSV string.
+ *
+ * See Papa Parse docs for more details about config options: https://www.papaparse.com/docs#json-to-csv
+ *
+ * @param {Array<Object>} data
+ * @param {Array<string>|null} columns
+ * @returns {string}
+ */
+const createTsvString = (data, columns=null) => {
+  return unparse(
+    data,
+    {
+      quotes: false,
+      quoteChar: '"',
+      escapeChar: '"',
+      delimiter: "\t",
+      header: true,
+      newline: "\n",
+      skipEmptyLines: true,
+      columns
+    }
+  );
+};
+
 const write = (filename, type, content) => {
   /* https://stackoverflow.com/questions/18848860/javascript-array-to-csv/18849208#comment59677504_18849208 */
   const blob = new Blob([content], { type: type });
@@ -121,12 +169,10 @@ export const areAuthorsPresent = (tree) => {
 
 /**
  * Create & write a TSV file where each row is an author,
- * with the relevent information (num isolates, journal etcetera)
+ * with the relevant information (num isolates, journal etcetera)
  */
 export const authorTSV = (dispatch, filePrefix, tree) => {
-  const lineArray = [];
-  lineArray.push(["Author", "n (strains)", "publication title", "journal", "publication URL", "strains"].join("\t"));
-  const filename = filePrefix + "_authors.tsv";
+  const COUNT = "n (strains)";
   const UNKNOWN = "unknown";
   const info = {};
   tree.nodes
@@ -136,25 +182,27 @@ export const authorTSV = (dispatch, filePrefix, tree) => {
       if (!author) return;
       if (info[author.value]) {
         /* this author has been seen before */
-        info[author.value].count += 1;
+        info[author.value][COUNT] += 1;
         info[author.value].strains.push(n.name);
       } else {
         /* author as-yet unseen */
         info[author.value] = {
-          author: author.value,
-          title: author.title || UNKNOWN,
+          Author: author.value,
+          "publication title": author.title || UNKNOWN,
           journal: author.journal || UNKNOWN,
-          url: isPaperURLValid(author) ? author.paper_url : UNKNOWN,
-          count: 1,
+          "publication URL": isPaperURLValid(author) ? author.paper_url : UNKNOWN,
+          [COUNT]: 1,
           strains: [n.name]
         };
       }
     });
-  Object.values(info).forEach((v) => {
-    lineArray.push([v.author, v.count, v.title, v.journal, v.url, v.strains.join(",")].join("\t"));
-  });
 
-  write(filename, MIME.tsv, lineArray.join("\n"));
+  /* Specify order of header fields */
+  const headerFields = ["Author", COUNT, "publication title", "journal", "publication URL", "strains"];
+
+  /* write out information we've collected */
+  const filename = filePrefix + "_authors.tsv";
+  write(filename, MIME.tsv, createTsvString(Object.values(info), headerFields));
   dispatch(infoNotification({message: "Author metadata exported", details: filename}));
 };
 
@@ -362,10 +410,11 @@ export const strainTSV = (dispatch, filePrefix, nodes, colorings, nodeVisibiliti
 
     /* handle `accession` specially */
     const accession = getAccessionFromNode(node);
+    console.log(accession);
     if (accession) {
       const traitName = "Accession";
       if (!headerFields.includes(traitName)) headerFields.push(traitName);
-      tipTraitValues[node.name][traitName] = accession;
+      tipTraitValues[node.name][traitName] = accession.accession;
     }
   }
 
@@ -397,7 +446,11 @@ export const exportTree = ({dispatch, filePrefix, tree, isNewick, temporal, colo
     dispatch(infoNotification({message: `${temporal ? "TimeTree" : "Tree"} written to ${fName}`}));
   } catch (err) {
     console.error(err);
-    dispatch(warningNotification({message: "Error saving tree!"}));
+    const warningObject = {message: "Error saving tree!"};
+    if (err instanceof EmptyNewickTreeCreated) {
+      warningObject.details = "An empty tree was created. If you have selected genomes, note that we do not support downloads of multiple subtrees.";
+    }
+    dispatch(warningNotification(warningObject));
   }
 };
 
@@ -481,7 +534,7 @@ const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLines
   }
 
   /* add top&left padding */
-  for (let key in panels) { // eslint-disable-line
+  for (const key in panels) {
     if (panels[key]) {
       panels[key].x += padding;
       panels[key].y += padding;
@@ -509,7 +562,7 @@ const injectAsSVGStrings = (output, key, data) => {
   output.push("</svg>");
 };
 
-/* define actual writer as a closure, because it may need to be triggered asyncronously */
+/* define actual writer as a closure, because it may need to be triggered asynchronously */
 const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLayout, textStrings, map) => {
   const errors = [];
   /* for each panel present in the DOM, create a data structure with the dimensions & the paths/shapes etc */
@@ -571,7 +624,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
   /* logic for extracting the overall width etc */
   const overallDimensions = createBoundingDimensionsAndPositionPanels(panels, panelLayout, textStrings.length);
   output.push(`<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="${overallDimensions.width}" height="${overallDimensions.height}">`);
-  for (let key in panels) { // eslint-disable-line
+  for (const key in panels) {
     if (panels[key]) {
       injectAsSVGStrings(output, key, panels[key]); // modifies output in place
     }
@@ -635,18 +688,25 @@ export const SVG = (dispatch, t, metadata, nodes, filters, visibility, visibleSt
 };
 
 export const entropyTSV = (dispatch, filePrefix, entropy, mutType) => {
-  const lines = mutType === "nuc" ? ["base"] : ["gene\tposition"];
-  lines[0] += entropy.showCounts ? "\tevents" : "\tentropy";
-  entropy.bars.forEach((bar) => {
-    if (mutType === "nuc") {
-      lines.push(`${bar.x}\t${bar.y}`);
-    } else {
-      lines.push(`${bar.prot}\t${bar.codon}\t${bar.y}`);
-    }
-  });
+  const headerEntropyBarMap = {
+    base: "x",
+    gene: "prot",
+    position: "codon",
+    events: "y",
+    entropy: "y"
+  };
+  // Change headers based on nuc/aa and events/entropy states
+  const headerFields = mutType === "nuc" ? ["base"] : ["gene", "position"];
+  headerFields.push(entropy.showCounts ? "events" : "entropy");
+
+  // Create array of data objects to write to TSV
+  const objectsToWrite = entropy.bars.map((bar) =>
+    Object.fromEntries(headerFields.map((field) => [field, bar[headerEntropyBarMap[field]]]))
+  );
+
   /* write out information we've collected */
   const filename = `${filePrefix}_diversity.tsv`;
-  write(filename, MIME.tsv, lines.join("\n"));
+  write(filename, MIME.tsv, createTsvString(objectsToWrite, headerFields));
   dispatch(infoNotification({message: `Diversity data exported to ${filename}`}));
 };
 

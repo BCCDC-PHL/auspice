@@ -1,6 +1,6 @@
 /* eslint-disable no-param-reassign */
 import { max } from "d3-array";
-import {getTraitFromNode, getDivFromNode} from "../../../util/treeMiscHelpers";
+import {getTraitFromNode, getDivFromNode, getBranchMutations} from "../../../util/treeMiscHelpers";
 
 /** get a string to be used as the DOM element ID
  * Note that this cannot have any "special" characters
@@ -12,96 +12,92 @@ export const getDomId = (type, strain) => {
 };
 
 /**
- * computes a measure of the total number of leaves for each node in
- * the tree, weighting leaves differently if they are inView.
- * Note: function is recursive
- * @param {obj} node -- root node of the tree
- * @returns {undefined}
- * @sideEffects sets `node.leafCount` {number} for all nodes
- */
-export const addLeafCount = (node) => {
-  if (node.terminal && node.inView) {
-    node.leafCount = 1;
-  } else if (node.terminal && !node.inView) {
-    node.leafCount = 0.15;
-  } else {
-    node.leafCount = 0;
-    for (let i = 0; i < node.children.length; i++) {
-      addLeafCount(node.children[i]);
-      node.leafCount += node.children[i].leafCount;
-    }
-  }
-};
-
-
-/*
  * this function takes a call back and applies it recursively
  * to all child nodes, including internal nodes
- * @params:
- *   node -- node to whose children the function is to be applied
- *   func -- call back function to apply
+ * @param {PhyloNode} node
+ * @param {Function} func - function to apply to each children. Is passed a single argument, the <PhyloNode> of the children.
  */
-export const applyToChildren = (node, func) => {
-  func(node);
-  if (node.terminal || node.children === undefined) { // in case clade set by URL, terminal hasn't been set yet!
+export const applyToChildren = (phyloNode, func) => {
+  func(phyloNode);
+  const node = phyloNode.n;
+  if ((!node.hasChildren) || (node.children === undefined)) { // in case clade set by URL, terminal hasn't been set yet!
     return;
   }
-  for (let i = 0; i < node.children.length; i++) {
-    applyToChildren(node.children[i], func);
+  for (const child of node.children) {
+    applyToChildren(child.shell, func);
   }
 };
 
-
-/*
-* given nodes, create the children and parent properties.
-* modifies the nodes argument in place
-*/
-export const createChildrenAndParentsReturnNumTips = (nodes) => {
-  let numTips = 0;
-  nodes.forEach((d) => {
-    d.parent = d.n.parent.shell;
-    if (d.terminal) {
-      d.yRange = [d.n.yvalue, d.n.yvalue];
-      d.children = null;
-      numTips++;
-    } else {
-      d.yRange = [d.n.children[0].yvalue, d.n.children[d.n.children.length - 1].yvalue];
-      d.children = [];
-      for (let i = 0; i < d.n.children.length; i++) {
-        d.children.push(d.n.children[i].shell);
-      }
-    }
-  });
-  return numTips;
-};
-
-/** setYValuesRecursively
+/** setDisplayOrderRecursively
+ * Calculates the display order of all nodes, which corresponds to the vertical position
+ * of nodes in a rectangular tree.
+ * If `yCounter` is undefined then we wish to hide the node and all descendants of it
+ * @param {PhyloNode} node
+ * @param {int|undefined} yCounter
+ * @sideeffect modifies node.displayOrder and node.displayOrderRange
+ * @returns {int|undefined} current yCounter after assignment to the tree originating from `node`
  */
-export const setYValuesRecursively = (node, yCounter) => {
-  if (node.children) {
-    for (let i = node.children.length - 1; i >= 0; i--) {
-      yCounter = setYValuesRecursively(node.children[i], yCounter);
+export const setDisplayOrderRecursively = (node, yCounter) => {
+  const children = node.n.children; // (redux) tree node
+  if (children && children.length) {
+    for (let i = children.length - 1; i >= 0; i--) {
+      yCounter = setDisplayOrderRecursively(children[i].shell, yCounter);
     }
   } else {
-    node.n.yvalue = ++yCounter;
-    node.yRange = [yCounter, yCounter];
+    node.displayOrder = (node.n.fullTipCount===0 || yCounter===undefined) ? yCounter : ++yCounter;
+    node.displayOrderRange = [yCounter, yCounter];
     return yCounter;
   }
-  /* if here, then all children have yvalues, but we dont. */
-  node.n.yvalue = node.children.reduce((acc, d) => acc + d.n.yvalue, 0) / node.children.length;
-  node.yRange = [node.n.children[0].yvalue, node.n.children[node.n.children.length - 1].yvalue];
+  /* if here, then all children have displayOrders, but we don't. */
+  node.displayOrder = children.reduce((acc, d) => acc + d.shell.displayOrder, 0) / children.length;
+  node.displayOrderRange = [children[0].shell.displayOrder, children[children.length - 1].shell.displayOrder];
   return yCounter;
 };
 
-/** setYValues
- * given nodes, this fn sets node.yvalue for each node
+/**
+ * heuristic function to return the appropriate spacing between subtrees for a given tree
+ * the returned value is to be interpreted as a count of the number of tips that would
+ * otherwise fit in the gap
+ */
+function _getSpaceBetweenSubtrees(numSubtrees, numTips) {
+  if (numSubtrees===1 || numTips<10) {
+    return 0;
+  }
+  if (numSubtrees*2 > numTips) {
+    return 0;
+  }
+  return numTips/20; /* note that it's not actually 5% of vertical space,
+                     as the final max yCount = numTips + numSubtrees*numTips/20 */
+}
+
+/** setDisplayOrder
+ * given nodes, this fn sets <phyloNode>.displayOrder for each node
  * Nodes are the phyloTree nodes (i.e. node.n is the redux node)
  * Nodes must have parent child links established (via createChildrenAndParents)
  * PhyloTree can subsequently use this information. Accessed by prototypes
  * rectangularLayout, radialLayout, createChildrenAndParents
- * side effects: node.n.yvalue (i.e. in the redux node) and node.yRange (i.e. in the phyloTree node)
+ * side effects: <phyloNode>.displayOrder (i.e. in the redux node) and <phyloNode>.displayOrderRange
+ * @param {Array<PhyloNode>} nodes
+ * @returns {undefined}
  */
-export const setYValues = (nodes) => setYValuesRecursively(nodes[0], 0);
+export const setDisplayOrder = (nodes) => {
+  const numSubtrees = nodes[0].n.children.filter((n) => n.fullTipCount!==0).length;
+  const numTips = nodes[0].n.fullTipCount;
+  const spaceBetweenSubtrees = _getSpaceBetweenSubtrees(numSubtrees, numTips);
+  let yCounter = 0;
+  /* iterate through each subtree, and add padding between each */
+  for (const subtree of nodes[0].n.children) {
+    if (subtree.fullTipCount===0) { // don't use screen space for this subtree
+      setDisplayOrderRecursively(nodes[subtree.arrayIdx], undefined);
+    } else {
+      yCounter = setDisplayOrderRecursively(nodes[subtree.arrayIdx], yCounter);
+      yCounter+=spaceBetweenSubtrees;
+    }
+  }
+  /* note that nodes[0] is a dummy node holding each subtree */
+  nodes[0].displayOrder = undefined;
+  nodes[0].displayOrderRange = [undefined, undefined];
+};
 
 
 export const formatDivergence = (divergence) => {
@@ -132,31 +128,62 @@ function isWithinBranchTolerance(node, otherNode, distanceMeasure) {
     const tolerance = (node.shell.that.dateRange[1]-node.shell.that.dateRange[0])/50;
     return (getTraitFromNode(node, "num_date") - tolerance < getTraitFromNode(otherNode, "num_date"));
   }
-  /* Compute the divergence tolerance similarly to above. This uses the approach used to compute the
-  x-axis grid within phyotree, and could be refactored into a helper function. Note that we don't store
-  the maximum divergence on the tree so we use the in-view max instead */
+
+  /* If mutations aren't defined, we fallback to calculating divergence tolerance similarly to temporal.
+  This uses the approach used to compute the x-axis grid within phyotree, and could be refactored into a
+  helper function. Note that we don't store the maximum divergence on the tree so we use the in-view max instead */
   const tolerance = (node.shell.that.xScale.domain()[1] - node.shell.that.nodes[0].depth)/50;
   return (getDivFromNode(node) - tolerance < getDivFromNode(otherNode));
 }
 
+/**
+ * Walk up the tree from node until we find either a node which has a nucleotide mutation or we
+ * reach the root of the (sub)tree. Gaps, deletions and undeletions do not count as mutations here.
+ */
+function findFirstBranchWithAMutation(node) {
+  if (node.parent === node) {
+    return node;
+  }
+  const categorisedMutations = getBranchMutations(node, {}); // 2nd param of `{}` means we skip homoplasy detection
+  if (categorisedMutations?.nuc?.unique?.length>0) {
+    return node.parent;
+  }
+
+  return findFirstBranchWithAMutation(node.parent);
+}
 
 /**
  * Given a `node`, get the parent, grandparent etc node which is beyond some
  * branch length threshold (either divergence or time). This is useful for finding the node
- * beyond a polytomy, or polytomy-like structure
+ * beyond a polytomy, or polytomy-like structure. If nucleotide mutations are defined on
+ * the tree (and distanceMeasure=div) then we find the first branch with a mutation.
  * @param {object} node - tree node
- * @param {string} getParentBeyondPolytomy -- 'num_date' or 'div'
+ * @param {string} distanceMeasure -- 'num_date' or 'div'
+ * @param {object} observedMutations
  * @returns {object} the closest node up the tree (towards the root) which is beyond
  * some threshold
  */
-export const getParentBeyondPolytomy = (node, distanceMeasure) => {
+export const getParentBeyondPolytomy = (node, distanceMeasure, observedMutations) => {
   let potentialNode = node.parent;
+  if (distanceMeasure==="div" && areNucleotideMutationsPresent(observedMutations)) {
+    return findFirstBranchWithAMutation(node);
+  }
   while (isWithinBranchTolerance(node, potentialNode, distanceMeasure)) {
     if (potentialNode === potentialNode.parent) break; // root node of tree
     potentialNode = potentialNode.parent;
   }
   return potentialNode;
 };
+
+function areNucleotideMutationsPresent(observedMutations) {
+  const mutList = Object.keys(observedMutations);
+  for (let idx=mutList.length-1; idx>=0; idx--) { // start at end, as nucs come last in the key-insertion order
+    if (mutList[idx].startsWith("nuc:")) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Prior to Jan 2020, the divergence measure was always "subs per site per year"
@@ -169,3 +196,40 @@ export function guessAreMutationsPerSite(scale) {
   const maxDivergence = max(scale.domain());
   return maxDivergence <= 5;
 }
+
+/**
+ * Is the node a subtree root node? (implies that we have either exploded trees or
+ * the dataset has multiple subtrees to display)
+ * @param {ReduxTreeNode} n
+ * @returns {bool}
+ */
+const isSubtreeRoot = (n) => (n.parent.name === "__ROOT" && n.parentInfo.original);
+
+/**
+ * Gets the parent node to be used for stem / branch calculation.
+ * Most of the time this is the same as `d.n.parent` however it is not in the
+ * case of the root nodes for subtrees (e.g. exploded trees).
+ * @param {Node} n
+ * @returns {Node}
+ */
+export const stemParent = (n) => {
+  return isSubtreeRoot(n) ? n.parentInfo.original : n.parent;
+};
+
+
+/**
+ * Returns a function which itself gets the order of the node and that of its parent.
+ * This is not strictly the same as the `displayOrder` the scatterplot axis
+ * renders increasing values going upwards (i.e. from the bottom to top of screen)
+ * whereas the rectangular tree renders zero at the top and goes downwards
+ * @param {Array<PhyloNode>} nodes
+ * @returns {function} which takes a single argument of type <PhyloNode>
+ */
+export const nodeOrdering = (nodes) => {
+  const maxVal = nodes.map((d) => d.displayOrder)
+    .reduce((acc, val) => ((val ?? 0) > acc ? val : acc), 0);
+  return (d) => ([
+    maxVal - d.displayOrder,
+    isSubtreeRoot(d.n) ? undefined : (maxVal - d.n.parent.shell.displayOrder)
+  ]);
+};

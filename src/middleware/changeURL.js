@@ -36,6 +36,8 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
   switch (action.type) {
     case types.CLEAN_START: // fallthrough
     case types.URL_QUERY_CHANGE_WITH_COMPUTED_STATE:
+      /* don't use queries when debugging a narrative as those URLs aren't intended to be restorable (yet) */
+      if (state.general.displayComponent==="debugNarrative") break;
       query = action.query;
       if (query.n === 0) delete query.n;
       if (query.tt) delete query.tt;
@@ -44,6 +46,11 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
       query.branchLabel = state.controls.defaults.selectedBranchLabel === action.value ?
         undefined :
         action.value;
+      break;
+    case types.TOGGLE_SHOW_ALL_BRANCH_LABELS:
+      /* This is not yet settable in display_defaults, and thus we want a URL query
+      that will still make sense when the default for the given branch labelling is "show all" */
+      query.showBranchLabels = action.value ? 'all' : undefined;
       break;
     case types.CHANGE_ZOOM:
       /* entropy panel genome zoom coordinates */
@@ -167,7 +174,7 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
         query.dmax = state.controls.dateMax === state.controls.absoluteDateMax ? undefined : state.controls.dateMax;
       }
       break;
-    case types.MIDDLEWARE_ONLY_ANIMATION_STARTED:
+    case types.MIDDLEWARE_ONLY_ANIMATION_STARTED: {
       /* animation started - format: start bound, end bound, loop 0|1, cumulative 0|1, speed in ms */
       const a = numericToCalendar(window.NEXTSTRAIN.animationStartPoint);
       const b = numericToCalendar(window.NEXTSTRAIN.animationEndPoint);
@@ -176,6 +183,7 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
       const e = state.controls.mapAnimationDurationInMilliseconds;
       query.animate = `${a},${b},${c},${d},${e}`;
       break;
+    }
     case types.PAGE_CHANGE:
       if (action.query) {
         query = action.query;
@@ -184,6 +192,8 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
       }
       break;
     case types.TOGGLE_NARRATIVE: {
+      /* don't use queries when debugging a narrative as those URLs aren't intended to be restorable (yet) */
+      if (state.general.displayComponent==="debugNarrative") break;
       if (action.narrativeOn === true) {
         query = {n: state.narrative.blockIdx};
       } else if (action.narrativeOn === false) {
@@ -200,10 +210,11 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
     case types.CLEAN_START:
       if (action.pathnameShouldBe && !action.narrative) {
         pathname = action.pathnameShouldBe;
+        break;
       }
       /* we also double check that if there are 2 trees both are represented
       in the URL */
-      if (action.tree.name && action.treeToo && action.treeToo.name) {
+      if (action.tree.name && action.treeToo && action.treeToo.name && !action.narrative) {
         const treeUrlShouldBe = `${action.tree.name}:${action.treeToo.name}`;
         if (!window.location.pathname.includes(treeUrlShouldBe)) {
           pathname = treeUrlShouldBe;
@@ -211,6 +222,10 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
       }
       break;
     case types.TOGGLE_NARRATIVE: {
+      /* when toggling between the narrative view & the underlying dataset view the intention is to
+      have the pathname represent the narrative and the dataset, respectively. However when we are
+      editing a narrative we _do not_ want to change the pathname */
+      if (state.general.displayComponent==="debugNarrative") break;
       if (action.narrativeOn === true) {
         pathname = state.narrative.pathname;
       } else if (action.narrativeOn === false) {
@@ -244,6 +259,9 @@ export const changeURLMiddleware = (store) => (next) => (action) => {
   }
 
   Object.keys(query).filter((q) => query[q] === "").forEach((k) => delete query[k]);
+  if (state.narrative.display) {
+    Object.keys(query).filter((q) => q!=='n').forEach((k) => delete query[k]);
+  }
   let search = queryString.stringify(query).replace(/%2C/g, ',').replace(/%2F/g, '/').replace(/%3A/g, ':');
   if (search) {search = "?" + search;}
   if (!pathname.startsWith("/")) {pathname = "/" + pathname;}

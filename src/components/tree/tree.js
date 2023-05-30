@@ -1,19 +1,22 @@
 import React from "react";
 import { withTranslation } from "react-i18next";
+import { FaSearchMinus } from "react-icons/fa";
 import { updateVisibleTipsAndBranchThicknesses } from "../../actions/tree";
 import Card from "../framework/card";
 import Legend from "./legend/legend";
 import PhyloTree from "./phyloTree/phyloTree";
+import { getParentBeyondPolytomy } from "./phyloTree/helpers";
 import HoverInfoPanel from "./infoPanels/hover";
-import TipClickedPanel from "./infoPanels/click";
+import NodeClickedPanel from "./infoPanels/click";
 import { changePhyloTreeViaPropsComparison } from "./reactD3Interface/change";
 import * as callbacks from "./reactD3Interface/callbacks";
 import { tabSingle, darkGrey, lightGrey } from "../../globalStyles";
 import { renderTree } from "./reactD3Interface/initialRender";
 import Tangle from "./tangle";
 import { attemptUntangle } from "../../util/globals";
-import ErrorBoundary from "../../util/errorBoundry";
+import ErrorBoundary from "../../util/errorBoundary";
 import { untangleTreeToo } from "./tangle/untangling";
+import { sortByGeneOrder } from "../../util/treeMiscHelpers";
 
 export const spaceBetweenTrees = 100;
 
@@ -26,19 +29,23 @@ class Tree extends React.Component {
     };
     this.tangleRef = undefined;
     this.state = {
-      hover: null,
-      selectedBranch: null,
-      selectedTip: null,
+      selectedNode: {},
       tree: null,
       treeToo: null
     };
     /* bind callbacks */
-    this.clearSelectedTip = callbacks.clearSelectedTip.bind(this);
+    this.clearSelectedNode = callbacks.clearSelectedNode.bind(this);
     // this.handleIconClickHOF = callbacks.handleIconClickHOF.bind(this);
     this.redrawTree = () => {
       this.props.dispatch(updateVisibleTipsAndBranchThicknesses({
         root: [0, 0]
       }));
+    };
+    /* pressing the escape key should dismiss an info modal (if one exists) */
+    this.handlekeydownEvent = (event) => {
+      if (event.key==="Escape" && this.state.selectedNode?.node) {
+        this.clearSelectedNode(this.state.selectedNode);
+      }
     };
   }
   setUpAndRenderTreeToo(props, newState) {
@@ -51,6 +58,7 @@ class Tree extends React.Component {
     renderTree(this, false, newState.treeToo, props);
   }
   componentDidMount() {
+    document.addEventListener('keyup', this.handlekeydownEvent);
     if (this.props.tree.loaded) {
       const newState = {};
       newState.tree = new PhyloTree(this.props.tree.nodes, "LEFT", this.props.tree.idxOfInViewRootNode);
@@ -58,7 +66,8 @@ class Tree extends React.Component {
       if (this.props.showTreeToo) {
         this.setUpAndRenderTreeToo(this.props, newState); /* modifies newState in place */
       }
-      this.setState(newState); /* this will trigger an unneccessary CDU :( */
+      newState.geneSortFn = sortByGeneOrder(this.props.metadata.genomeAnnotations);
+      this.setState(newState); /* this will trigger an unnecessary CDU :( */
     }
   }
   componentDidUpdate(prevProps) {
@@ -82,16 +91,20 @@ class Tree extends React.Component {
         if (this.tangleRef) this.tangleRef.drawLines();
       }
     } else if (this.state.treeToo) { /* the tree hasn't just been swapped, but it does exist and may need updating */
-      let unusedNewState; // eslint-disable-line
-      [unusedNewState, rightTreeUpdated] = changePhyloTreeViaPropsComparison(false, this.state.treeToo, prevProps, this.props);
-      /* note, we don't incorporate unusedNewState into the state? why not? */
+      let _unusedNewState;
+      [_unusedNewState, rightTreeUpdated] = changePhyloTreeViaPropsComparison(false, this.state.treeToo, prevProps, this.props);
+      /* note, we don't incorporate _unusedNewState into the state? why not? */
     }
 
-    /* we may need to (imperitively) tell the tangle to redraw */
+    /* we may need to (imperatively) tell the tangle to redraw */
     if (this.tangleRef && (leftTreeUpdated || rightTreeUpdated)) {
       this.tangleRef.drawLines();
     }
     if (Object.keys(newState).length) this.setState(newState);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('keyup', this.handlekeydownEvent);
   }
 
   getStyles = () => {
@@ -103,6 +116,9 @@ class Tree extends React.Component {
     const filteredTreeToo = !!this.props.treeToo.idxOfFilteredRoot &&
       this.props.treeToo.idxOfInViewRootNode !== this.props.treeToo.idxOfFilteredRoot;
     const activeZoomButton = filteredTree || filteredTreeToo;
+
+    const treeIsZoomed = this.props.tree.idxOfInViewRootNode !== 0 ||
+      this.props.treeToo.idxOfInViewRootNode !== 0;
 
     return {
       treeButtonsDiv: {
@@ -120,10 +136,18 @@ class Tree extends React.Component {
       },
       zoomToSelectedButton: {
         zIndex: 100,
-        dispaly: "inline-block",
+        display: "inline-block",
         cursor: activeZoomButton ? "pointer" : "auto",
         color: activeZoomButton ? darkGrey : lightGrey,
         pointerEvents: activeZoomButton ? "auto" : "none"
+      },
+      zoomOutButton: {
+        zIndex: 100,
+        display: "inline-block",
+        cursor: treeIsZoomed ? "pointer" : "auto",
+        color: treeIsZoomed ? darkGrey : lightGrey,
+        pointerEvents: treeIsZoomed ? "auto" : "none",
+        marginRight: "4px"
       }
     };
   };
@@ -146,6 +170,22 @@ class Tree extends React.Component {
     }));
   };
 
+  zoomBack = () => {
+    let newRoot, newRootToo;
+    // Zoom out of main tree if index of root node is not 0
+    if (this.props.tree.idxOfInViewRootNode !== 0) {
+      const rootNode = this.props.tree.nodes[this.props.tree.idxOfInViewRootNode];
+      newRoot = getParentBeyondPolytomy(rootNode, this.props.distanceMeasure, this.props.tree.observedMutations).arrayIdx;
+    }
+    // Also zoom out of second tree if index of root node is not 0
+    if (this.props.treeToo.idxOfInViewRootNode !== 0) {
+      const rootNodeToo = this.props.treeToo.nodes[this.props.treeToo.idxOfInViewRootNode];
+      newRootToo = getParentBeyondPolytomy(rootNodeToo, this.props.distanceMeasure, this.props.treeToo.observedMutations).arrayIdx;
+    }
+    const root = [newRoot, newRootToo];
+    this.props.dispatch(updateVisibleTipsAndBranchThicknesses({root}));
+  }
+
   render() {
     const { t } = this.props;
     const styles = this.getStyles();
@@ -156,18 +196,22 @@ class Tree extends React.Component {
           <Legend width={this.props.width}/>
         </ErrorBoundary>
         <HoverInfoPanel
-          hovered={this.state.hovered}
+          selectedNode={this.state.selectedNode}
           colorBy={this.props.colorBy}
           colorByConfidence={this.props.colorByConfidence}
           colorScale={this.props.colorScale}
           colorings={this.props.metadata.colorings}
+          geneSortFn={this.state.geneSortFn}
+          observedMutations={this.props.tree.observedMutations}
           panelDims={{width: this.props.width, height: this.props.height, spaceBetweenTrees}}
           t={t}
         />
-        <TipClickedPanel
-          goAwayCallback={this.clearSelectedTip}
-          tip={this.state.selectedTip}
+        <NodeClickedPanel
+          clearSelectedNode={this.clearSelectedNode}
+          selectedNode={this.state.selectedNode}
+          observedMutations={this.props.tree.observedMutations}
           colorings={this.props.metadata.colorings}
+          geneSortFn={this.state.geneSortFn}
           t={t}
         />
         {this.props.showTangle && this.state.tree && this.state.treeToo ? (
@@ -195,6 +239,12 @@ class Tree extends React.Component {
         }
         {this.props.narrativeMode ? null : (
           <div style={{...styles.treeButtonsDiv}}>
+            <button
+              style={{...tabSingle, ...styles.zoomOutButton}}
+              onClick={this.zoomBack}
+            >
+              <FaSearchMinus/>
+            </button>
             <button
               style={{...tabSingle, ...styles.zoomToSelectedButton}}
               onClick={this.zoomToSelected}

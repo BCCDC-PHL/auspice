@@ -1,5 +1,4 @@
-[![Build Status](https://travis-ci.com/nextstrain/auspice.svg?branch=master)](https://travis-ci.com/nextstrain/auspice)
-[![GitHub CI Status](https://travis-ci.com/nextstrain/auspice.svg?branch=master)](https://github.com/nextstrain/auspice/actions?query=workflow%3Aci)
+[![Build Status](https://github.com/nextstrain/auspice/actions/workflows/ci.yaml/badge.svg?branch=master)](https://github.com/nextstrain/auspice/actions/workflows/ci.yaml?query=branch:master)
 [![NPM version](https://img.shields.io/npm/v/auspice.svg?style=flat)](https://www.npmjs.com/package/auspice)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
@@ -31,33 +30,7 @@ For more detailed technical information how Auspice works and reference guides d
 
 ### Installation
 
-Install auspice for use as a global command.
-This requires nodejs.
-We recommend using a conda environment, but this is not the only way.
-(See [here](https://nextstrain.github.io/auspice/introduction/install) for more installation methods & help).
-
-#### Install with conda (Recommended)
-
-Create and activate a [conda](https://docs.conda.io) environment:
-
-```bash
-conda create --name auspice nodejs=12
-conda activate auspice
-```
-
-Now that the conda environment is activated, install auspice:
-
-```bash
-npm install --global auspice
-```
-
-#### Install from source
-
-```bash
-git clone https://github.com/nextstrain/auspice.git
-cd auspice
-npm install --global .
-```
+See [the relevant page on Auspice docs](https://docs.nextstrain.org/projects/auspice/en/stable/introduction/install.html).
 
 ### Obtain datasets to display
 
@@ -73,7 +46,7 @@ curl http://data.nextstrain.org/ncov.json --compressed -o data/ncov.json
 ...
 ```
 
-If you've installed auspice from source, we have helper scripts to make all the datasets & narratives you see on nextstrain.org available locally:
+If you've installed auspice from source, we have a helper script to download a number of datasets for testing:
 
 ```bash
 # from the auspice src directory
@@ -118,6 +91,6 @@ This project strictly adheres to the [Contributor Covenant Code of Conduct](http
 
 ## License and copyright
 
-Copyright 2014-2020 Trevor Bedford and Richard Neher.
+Copyright 2014-2022 Trevor Bedford and Richard Neher.
 
 Source code to Nextstrain is made available under the terms of the [GNU Affero General Public License](LICENSE.txt) (AGPL). Nextstrain is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.

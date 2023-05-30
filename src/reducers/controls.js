@@ -11,6 +11,7 @@ import { defaultGeoResolution,
 import * as types from "../actions/types";
 import { calcBrowserDimensionsInitialState } from "./browserDimensions";
 import { doesColorByHaveConfidence } from "../actions/recomputeReduxState";
+import { hasMultipleGridPanels } from "../actions/panelDisplay";
 
 /* defaultState is a fn so that we can re-create it
 at any time, e.g. if we want to revert things (e.g. on dataset change)
@@ -21,6 +22,7 @@ export const getDefaultControlsState = () => {
     layout: defaultLayout,
     geoResolution: defaultGeoResolution,
     filters: {},
+    filtersInFooter: [],
     colorBy: defaultColorBy,
     selectedBranchLabel: "none",
     showTransmissionLines: true
@@ -40,7 +42,6 @@ export const getDefaultControlsState = () => {
     defaults,
     available: undefined,
     canTogglePanelLayout: true,
-    selectedBranch: null,
     selectedNode: null,
     region: null,
     search: null,
@@ -62,11 +63,14 @@ export const getDefaultControlsState = () => {
     colorBy: defaults.colorBy,
     colorByConfidence: { display: false, on: false },
     colorScale: undefined,
+    explodeAttr: undefined,
     selectedBranchLabel: "none",
+    showAllBranchLabels: false,
     canRenderBranchLabels: true,
     analysisSlider: false,
     geoResolution: defaults.geoResolution,
-    filters: {},
+    filters: defaults.filters,
+    filtersInFooter: defaults.filtersInFooter,
     showDownload: false,
     quickdraw: false, // if true, components may skip expensive computes.
     mapAnimationDurationInMilliseconds: 30000, // in milliseconds
@@ -88,7 +92,12 @@ export const getDefaultControlsState = () => {
     mapLegendOpen: undefined,
     showOnlyPanels: false,
     showTransmissionLines: true,
-    normalizeFrequencies: true
+    normalizeFrequencies: true,
+    measurementsGroupBy: undefined,
+    measurementsDisplay: "mean",
+    measurementsShowOverallMean: true,
+    measurementsShowThreshold: true,
+    measurementsFilters: {}
   };
 };
 
@@ -102,14 +111,6 @@ const Controls = (state = getDefaultControlsState(), action) => {
       return action.controls;
     case types.SET_AVAILABLE:
       return Object.assign({}, state, { available: action.data });
-    case types.BRANCH_MOUSEENTER:
-      return Object.assign({}, state, {
-        selectedBranch: action.data
-      });
-    case types.BRANCH_MOUSELEAVE:
-      return Object.assign({}, state, {
-        selectedBranch: null
-      });
     case types.NODE_MOUSEENTER:
       return Object.assign({}, state, {
         selectedNode: action.data
@@ -118,8 +119,15 @@ const Controls = (state = getDefaultControlsState(), action) => {
       return Object.assign({}, state, {
         selectedNode: null
       });
+    case types.CHANGE_EXPLODE_ATTR:
+      return Object.assign({}, state, {
+        explodeAttr: action.explodeAttr,
+        colorScale: Object.assign({}, state.colorScale, { visibleLegendValues: action.visibleLegendValues })
+      });
     case types.CHANGE_BRANCH_LABEL:
       return Object.assign({}, state, { selectedBranchLabel: action.value });
+    case types.TOGGLE_SHOW_ALL_BRANCH_LABELS:
+      return Object.assign({}, state, { showAllBranchLabels: action.value });
     case types.CHANGE_LAYOUT:
       return Object.assign({}, state, {
         layout: action.layout,
@@ -135,7 +143,7 @@ const Controls = (state = getDefaultControlsState(), action) => {
           on: false
         })
       });
-    case types.CHANGE_DISTANCE_MEASURE:
+    case types.CHANGE_DISTANCE_MEASURE: {
       const updatesToState = {
         distanceMeasure: action.data,
         branchLengthsToDisplay: state.branchLengthsToDisplay
@@ -153,7 +161,8 @@ const Controls = (state = getDefaultControlsState(), action) => {
         });
       }
       return Object.assign({}, state, updatesToState);
-    case types.CHANGE_DATES_VISIBILITY_THICKNESS: {
+    }
+      case types.CHANGE_DATES_VISIBILITY_THICKNESS: {
       const newDates = { quickdraw: action.quickdraw };
       if (action.dateMin) {
         newDates.dateMin = action.dateMin;
@@ -209,9 +218,7 @@ const Controls = (state = getDefaultControlsState(), action) => {
       return Object.assign({}, state, {
         panelsToDisplay: action.panelsToDisplay,
         panelLayout: action.panelLayout,
-        canTogglePanelLayout:
-          action.panelsToDisplay.indexOf("tree") !== -1 &&
-          action.panelsToDisplay.indexOf("map") !== -1
+        canTogglePanelLayout: action.canTogglePanelLayout
       });
     case types.NEW_COLORS: {
       const newState = Object.assign({}, state, {
@@ -258,7 +265,7 @@ const Controls = (state = getDefaultControlsState(), action) => {
       return Object.assign({}, state, {
         showTreeToo: undefined,
         showTangle: false,
-        canTogglePanelLayout: state.panelsAvailable.indexOf("map") !== -1,
+        canTogglePanelLayout: hasMultipleGridPanels(state.panelsAvailable),
         panelsToDisplay: state.panelsAvailable.slice()
       });
     case types.TOGGLE_TANGLE:
@@ -270,7 +277,7 @@ const Controls = (state = getDefaultControlsState(), action) => {
       return Object.assign({}, state, { sidebarOpen: action.value });
     case types.TOGGLE_LEGEND:
       return Object.assign({}, state, { legendOpen: action.value });
-    case types.ADD_EXTRA_METADATA:
+    case types.ADD_EXTRA_METADATA: {
       for (const colorBy of Object.keys(action.newColorings)) {
         state.filters[colorBy] = [];
         state.coloringsPresentOnTree.add(colorBy);
@@ -280,15 +287,17 @@ const Controls = (state = getDefaultControlsState(), action) => {
         newState = {
           ...newState,
           geoResolution: action.newGeoResolution.key,
-          canTogglePanelLayout: true,
+          canTogglePanelLayout: hasMultipleGridPanels([...state.panelsToDisplay, "map"]),
           panelsAvailable: [...state.panelsAvailable, "map"],
           panelsToDisplay: [...state.panelsToDisplay, "map"]
         };
       }
       return newState;
-    case types.UPDATE_VISIBILITY_AND_BRANCH_THICKNESS:
+    }
+    case types.UPDATE_VISIBILITY_AND_BRANCH_THICKNESS: {
       const colorScale = Object.assign({}, state.colorScale, { visibleLegendValues: action.visibleLegendValues });
       return Object.assign({}, state, { colorScale: colorScale });
+    }
     case types.TOGGLE_TRANSMISSION_LINES:
       return Object.assign({}, state, { showTransmissionLines: action.data });
 
@@ -300,6 +309,19 @@ const Controls = (state = getDefaultControlsState(), action) => {
       }
       return state;
     }
+    case types.LOAD_MEASUREMENTS: /* fallthrough */
+    case types.CHANGE_MEASUREMENTS_COLLECTION:
+      return {...state, ...action.controls};
+    case types.CHANGE_MEASUREMENTS_GROUP_BY:
+      return {...state, measurementsGroupBy: action.data};
+    case types.TOGGLE_MEASUREMENTS_THRESHOLD:
+      return {...state, measurementsShowThreshold: action.data};
+    case types.TOGGLE_MEASUREMENTS_OVERALL_MEAN:
+      return {...state, measurementsShowOverallMean: action.data};
+    case types.CHANGE_MEASUREMENTS_DISPLAY:
+      return {...state, measurementsDisplay: action.data};
+    case types.APPLY_MEASUREMENTS_FILTER:
+      return {...state, measurementsFilters: action.data};
     default:
       return state;
   }

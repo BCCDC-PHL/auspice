@@ -14,7 +14,7 @@ export const updateTipLabels = function updateTipLabels(dt) {
   const xPad = this.params.tipLabelPadX;
   const yPad = this.params.tipLabelPadY;
 
-  const inViewTips = this.nodes.filter((d) => d.terminal).filter((d) => d.inView);
+  const inViewTips = this.nodes.filter((d) => !d.n.hasChildren).filter((d) => d.inView);
 
   const inViewVisibleTips = inViewTips.filter((d) => d.visibility === NODE_VISIBLE);
 
@@ -70,23 +70,26 @@ const branchLabelFontWeight = (key) => {
 
 /** createBranchLabelVisibility (the return value should be passed to d3 style call)
  * @param {str} key e.g. "aa" or "clade"
+ * @param {bool} showAll
  * @param {str} layout
  * @param {int} totalTipsInView visible tips also in view
  * @return {func} Returns a function with 1 argument: the current node (branch).
  *                This fn will return "visible" or "hidden".
  *                NOTE: the fn should only be provided nodes which have a label.
  */
-const createBranchLabelVisibility = (key, layout, totalTipsInView) => (d) => {
+const createBranchLabelVisibility = (key, showAll, layout, totalTipsInView) => (d) => {
+  if (showAll) return "visible";
   if (d.visibility !== NODE_VISIBLE) return "hidden";
-  if (key!=="aa") return "visible";
-  const magicTipFractionToShowBranchLabel = 0.05;
-  if (layout !== "rect") {
-    return "hidden";
-  }
+  const magicTipFractionToShowBranchLabel = 0.03;
   /* if the number of _visible_ tips descending from this node are over the
   magicTipFractionToShowBranchLabel (c/w the total number of _visible_ and
   _inView_ tips then display the label */
   if (d.n.tipCount > magicTipFractionToShowBranchLabel * totalTipsInView) {
+    return "visible";
+  }
+  /* if the label is on the root of a subtree then always show it
+  (unless the label is "aa" as these can be very long) */
+  if (key!=='aa' && (d.n.name===d.n.parent.name || d.n.parent.name==="__ROOT")) {
     return "visible";
   }
   return "hidden";
@@ -98,6 +101,7 @@ export const updateBranchLabels = function updateBranchLabels(dt) {
   }
   const visibility = createBranchLabelVisibility(
     this.params.branchLabelKey,
+    this.params.showAllBranchLabels,
     this.layout,
     this.zoomNode.n.tipCount
   );
@@ -127,10 +131,10 @@ export const drawBranchLabels = function drawBranchLabels(key) {
   this.params.branchLabelKey = key;
   const labelSize = branchLabelSize(key);
   const fontWeight = branchLabelFontWeight(key);
-  const visibility = createBranchLabelVisibility(key, this.layout, this.zoomNode.n.tipCount);
+  const visibility = createBranchLabelVisibility(key, this.params.showAllBranchLabels, this.layout, this.zoomNode.n.tipCount);
 
   if (!("branchLabels" in this.groups)) {
-    this.groups.branchLabels = this.svg.append("g").attr("id", "branchLabels");
+    this.groups.branchLabels = this.svg.append("g").attr("id", "branchLabels").attr("clip-path", "url(#treeClip)");
   }
   this.groups.branchLabels
     .selectAll(".branchLabel")
@@ -150,6 +154,7 @@ export const drawBranchLabels = function drawBranchLabels(key) {
     .style("font-family", this.params.branchLabelFont)
     .style("font-weight", fontWeight)
     .style("font-size", labelSize)
+    .style("pointer-events", "none")
     .text((d) => d.n.branch_attrs.labels[key]);
 };
 

@@ -1,14 +1,15 @@
 import React from "react";
 import { connect } from "react-redux";
-import "react-select/dist/react-select.css";
-import "react-virtualized-select/styles.css";
-import Select from "react-virtualized-select";
+import AsyncSelect from "react-select/async";
 import { debounce } from 'lodash';
 import { controlsWidth, isValueValid, strainSymbol, genotypeSymbol} from "../../util/globals";
 import { collectGenotypeStates } from "../../util/treeMiscHelpers";
 import { applyFilter } from "../../actions/tree";
+import { removeAllFieldFilters, toggleAllFieldFilters, applyMeasurementFilter } from "../../actions/measurements";
 import { FilterBadge } from "../info/filterBadge";
+import { customSelectStyles } from "./customSelect";
 import { SidebarSubtitle } from "./styles";
+import VirtualizedMenuList from "./virtualizedMenuList";
 
 const DEBOUNCE_TIME = 200;
 
@@ -23,7 +24,10 @@ const DEBOUNCE_TIME = 200;
     activeFilters: state.controls.filters,
     colorings: state.metadata.colorings,
     totalStateCounts: state.tree.totalStateCounts,
-    nodes: state.tree.nodes
+    nodes: state.tree.nodes,
+    measurementsFieldsMap: state.measurements.collectionToDisplay.fields,
+    measurementsFiltersMap: state.measurements.collectionToDisplay.filters,
+    measurementsFilters: state.controls.measurementsFilters
   };
 })
 class FilterData extends React.Component {
@@ -85,10 +89,26 @@ class FilterData extends React.Component {
           });
         });
     }
+    if (this.props.measurementsOn && this.props.measurementsFiltersMap && this.props.measurementsFieldsMap) {
+      this.props.measurementsFiltersMap.forEach(({values}, filterField) => {
+        const { title } = this.props.measurementsFieldsMap.get(filterField);
+        values.forEach((value) => {
+          options.push({
+            _type: "measurements", // custom field to differentiate measurements filters
+            label: `(M) ${title} → ${value}`,
+            value: [filterField, value]
+          });
+        });
+      });
+    }
     return options;
   }
   selectionMade = (sel) => {
-    this.props.dispatch(applyFilter("add", sel.value[0], [sel.value[1]]));
+    // Process measurement filters separately than tree filters
+    if (sel._type === "measurements") {
+      return this.props.dispatch(applyMeasurementFilter(sel.value[0], sel.value[1], true));
+    }
+    return this.props.dispatch(applyFilter("add", sel.value[0], [sel.value[1]]));
   }
   summariseFilters = () => {
     const filterNames = Reflect.ownKeys(this.props.activeFilters)
@@ -105,33 +125,45 @@ class FilterData extends React.Component {
       };
     });
   }
+  summariseMeasurementsFilters = () => {
+    return Object.entries(this.props.measurementsFilters).map(([field, valuesMap]) => {
+      const activeFiltersCount = Array.from(valuesMap.values()).reduce((prevCount, currentValue) => {
+        return currentValue.active ? prevCount + 1 : prevCount;
+      }, 0);
+      return {
+        field,
+        activeFiltersCount,
+        badgeTitle: `${activeFiltersCount} x ${this.props.measurementsFieldsMap.get(field).title}`
+      };
+    });
+  }
   render() {
     // options only need to be calculated a single time per render, and by adding a debounce
     // to `loadOptions` we don't slow things down by comparing queries to a large number of options
     const options = this.makeOptions();
-    const loadOptions = debounce((input, callback) => callback(null, {options}), DEBOUNCE_TIME);
+    const loadOptions = debounce((input, callback) => callback(options), DEBOUNCE_TIME);
     const filterOption = (option, filter) => filter.toLowerCase().split(" ").every((word) => option.label.toLowerCase().includes(word));
     const styles = this.getStyles();
     const inUseFilters = this.summariseFilters();
+    const measurementsFilters = this.summariseMeasurementsFilters();
     /* When filter categories were dynamically created (via metadata drag&drop) the `options` here updated but `<Async>`
     seemed to use a cached version of all values & wouldn't update. Changing the key forces a rerender, but it's not ideal */
     const divKey = String(Object.keys(this.props.activeFilters).length);
     return (
       <div style={styles.base} key={divKey}>
-        <Select
-          async
+        <AsyncSelect
           name="filterQueryBox"
           placeholder="Type filter query here..."
-          value={undefined}
-          arrowRenderer={null}
+          value={null}
+          defaultOptions
           loadOptions={loadOptions}
           filterOption={filterOption}
-          ignoreAccents={false}
-          clearable={false}
-          searchable
-          multi={false}
-          valueKey="label"
+          isClearable={false}
+          isSearchable
+          isMulti={false}
+          components={{ DropdownIndicator: null, MenuList: VirtualizedMenuList }}
           onChange={this.selectionMade}
+          styles={customSelectStyles}
         />
         {inUseFilters.length ? (
           <>
@@ -155,6 +187,28 @@ class FilterData extends React.Component {
             ))}
           </>
         ) : null}
+        {measurementsFilters.length ? (
+          <>
+            <SidebarSubtitle spaceAbove>
+              {"Currently selected measurements filters:"}
+            </SidebarSubtitle>
+            {measurementsFilters.map(({field, activeFiltersCount, badgeTitle}) => (
+              <div style={{display: 'inline-block', margin: '2px'}} key={badgeTitle}>
+                <FilterBadge
+                  active={activeFiltersCount > 0}
+                  canMakeInactive
+                  id={badgeTitle}
+                  remove={() => this.props.dispatch(removeAllFieldFilters(field))}
+                  activate={() => this.props.dispatch(toggleAllFieldFilters(field, true))}
+                  inactivate={() => this.props.dispatch(toggleAllFieldFilters(field, false))}
+                  onHoverMessage={`Measurements are currently filtered by ${badgeTitle}`}
+                >
+                  {badgeTitle}
+                </FilterBadge>
+              </div>
+            ))}
+          </>
+        ): null}
       </div>
     );
   }
@@ -170,6 +224,9 @@ export const FilterInfo = (
     <br/>
     Scroll to the bottom of the main page (under the data visualisation)
     to see an expanded display of filters and available values.
+    <br/>
+    Filter options prefixed with &quot;(M)&quot; are filters specific to the Measurements panel.
+    They will have no effect on the phylogeny tree or other panels.
   </>
 );
 

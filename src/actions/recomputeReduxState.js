@@ -6,6 +6,8 @@ import { calcBrowserDimensionsInitialState } from "../reducers/browserDimensions
 import { getIdxMatchingLabel, calculateVisiblityAndBranchThickness } from "../util/treeVisibilityHelpers";
 import { constructVisibleTipLookupBetweenTrees } from "../util/treeTangleHelpers";
 import { getDefaultControlsState, shouldDisplayTemporalConfidence } from "../reducers/controls";
+import { getDefaultFrequenciesState } from "../reducers/frequencies";
+import { getDefaultMeasurementsState } from "../reducers/measurements";
 import { countTraitsAcrossTree, calcTotalTipsInTree } from "../util/treeCountingHelpers";
 import { calcEntropyInView } from "../util/entropy";
 import { treeJsonToState } from "../util/treeJsonProcessing";
@@ -18,6 +20,7 @@ import { validateScatterVariables } from "../util/scatterplotHelpers";
 import { isColorByGenotype, decodeColorByGenotype, decodeGenotypeFilters, encodeGenotypeFilters } from "../util/getGenotype";
 import { getTraitFromNode, getDivFromNode, collectGenotypeStates } from "../util/treeMiscHelpers";
 import { collectAvailableTipLabelOptions } from "../components/controls/choose-tip-label";
+import { hasMultipleGridPanels } from "./panelDisplay";
 
 export const doesColorByHaveConfidence = (controlsState, colorBy) =>
   controlsState.coloringsPresentOnTreeWithConfidence.has(colorBy);
@@ -69,18 +72,23 @@ const modifyStateViaURLQuery = (state, query) => {
   if (query.r) {
     state["geoResolution"] = query.r;
   }
+  /**
+   * `query.d` should be processed before `query.p` since the panels to be
+   * displayed affects the panel layout.
+   */
+  if (query.d) {
+    const proposed = query.d.split(",");
+    state.panelsToDisplay = state.panelsAvailable.filter((n) => proposed.indexOf(n) !== -1);
+    state.canTogglePanelLayout = hasMultipleGridPanels(state.panelsToDisplay);
+    if (!state.canTogglePanelLayout) {
+      state["panelLayout"] = "full";
+    }
+  }
   if (query.p && state.canTogglePanelLayout && (query.p === "full" || query.p === "grid")) {
     state["panelLayout"] = query.p;
   }
   if (query.tl) {
     state["tipLabelKey"] = query.tl;
-  }
-  if (query.d) {
-    const proposed = query.d.split(",");
-    state.panelsToDisplay = state.panelsAvailable.filter((n) => proposed.indexOf(n) !== -1);
-    if (state.panelsToDisplay.indexOf("map") === -1 || state.panelsToDisplay.indexOf("tree") === -1) {
-      state["panelLayout"] = "full";
-    }
   }
   if (query.dmin) {
     state["dateMin"] = query.dmin;
@@ -119,6 +127,9 @@ const modifyStateViaURLQuery = (state, query) => {
   if (query.branchLabel) {
     state.selectedBranchLabel = query.branchLabel;
     // do not modify the default (only the JSON can do this)
+  }
+  if (query.showBranchLabels === "all") {
+    state.showAllBranchLabels = true;
   }
   if (query.sidebar) {
     if (query.sidebar === "open") {
@@ -184,6 +195,8 @@ const restoreQueryableStateToDefaults = (state) => {
   state.panelsToDisplay = state.panelsAvailable.slice();
   state.tipLabelKey = strainSymbol;
   state.scatterVariables = {};
+
+  state.showAllBranchLabels = false;
   // console.log("state now", state);
   return state;
 };
@@ -225,11 +238,11 @@ const modifyStateViaMetadata = (state, metadata) => {
   state.filters[genotypeSymbol] = []; // this doesn't necessitate that mutations are defined
   if (metadata.displayDefaults) {
     const keysToCheckFor = ["geoResolution", "colorBy", "distanceMeasure", "layout", "mapTriplicate", "selectedBranchLabel", 'sidebar', "showTransmissionLines", "normalizeFrequencies"];
-    const expectedTypes =  ["string",        "string",  "string",          "string", "boolean",       "string",              'string',  "boolean"              , "boolean"]; // eslint-disable-line
+    const expectedTypes =  ["string",        "string",  "string",          "string", "boolean",       "string",              'string',  "boolean"              , "boolean"];
 
     for (let i = 0; i < keysToCheckFor.length; i += 1) {
       if (Object.hasOwnProperty.call(metadata.displayDefaults, keysToCheckFor[i])) {
-        if (typeof metadata.displayDefaults[keysToCheckFor[i]] === expectedTypes[i]) { // eslint-disable-line valid-typeof
+        if (typeof metadata.displayDefaults[keysToCheckFor[i]] === expectedTypes[i]) {
           if (keysToCheckFor[i] === "sidebar") {
             if (metadata.displayDefaults[keysToCheckFor[i]] === "open") {
               state.defaults.sidebarOpen = true;
@@ -241,7 +254,7 @@ const modifyStateViaMetadata = (state, metadata) => {
               console.error("Skipping 'display_default' for sidebar as it's not 'open' or 'closed'");
             }
           } else {
-            /* most of the time if key=geoResoltion, set both state.geoResolution and state.defaults.geoResolution */
+            /* most of the time if key=geoResolution, set both state.geoResolution and state.defaults.geoResolution */
             state[keysToCheckFor[i]] = metadata.displayDefaults[keysToCheckFor[i]];
             state.defaults[keysToCheckFor[i]] = metadata.displayDefaults[keysToCheckFor[i]];
           }
@@ -291,7 +304,7 @@ const modifyStateViaMetadata = (state, metadata) => {
 
   /* if only map or only tree, then panelLayout must be full */
   /* note - this will be overwritten by the URL query */
-  if (state.panelsAvailable.indexOf("map") === -1 || state.panelsAvailable.indexOf("tree") === -1) {
+  if (!hasMultipleGridPanels(state.panelsToDisplay)) {
     state.panelLayout = "full";
     state.canTogglePanelLayout = false;
   }
@@ -349,6 +362,7 @@ const modifyControlsStateViaTree = (state, tree, treeToo, colorings) => {
     coloringsToCheck = Object.keys(colorings);
   }
   let [aaMuts, nucMuts] = [false, false];
+  let num_date_confidence = false; /* flag. Is confidence defined anywhere on the tree? */
   const examineNodes = function examineNodes(nodes) {
     nodes.forEach((node) => {
       /* check colorBys */
@@ -367,6 +381,10 @@ const modifyControlsStateViaTree = (state, tree, treeToo, colorings) => {
         const keys = Object.keys(node.branch_attrs.mutations);
         if (keys.length > 1 || (keys.length === 1 && keys[0]!=="nuc")) aaMuts = true;
         if (keys.includes("nuc")) nucMuts = true;
+      }
+      /* check num_date confidence */
+      if (!num_date_confidence && getTraitFromNode(node, "num_date", {confidence: true})) {
+        num_date_confidence = true;
       }
     });
   };
@@ -407,9 +425,8 @@ const modifyControlsStateViaTree = (state, tree, treeToo, colorings) => {
     state.selectedBranchLabel = "clade";
   }
 
-  state.temporalConfidence = getTraitFromNode(tree.nodes[0], "num_date", {confidence: true}) ?
-    {exists: true, display: true, on: false} :
-    {exists: false, display: false, on: false};
+  state.temporalConfidence = {exists: num_date_confidence, display: num_date_confidence, on: false};
+
   return state;
 };
 
@@ -475,7 +492,7 @@ const checkAndCorrectErrorsInState = (state, metadata, query, tree, viewingNarra
   if (metadata.geoResolutions) {
     const availableGeoResultions = metadata.geoResolutions.map((i) => i.key);
     if (availableGeoResultions.indexOf(state["geoResolution"]) === -1) {
-      /* fallbacks: JSON defined default, then hardocded default, then any available */
+      /* fallbacks: JSON defined default, then hardcoded default, then any available */
       if (metadata.displayDefaults && metadata.displayDefaults.geoResolution && availableGeoResultions.indexOf(metadata.displayDefaults.geoResolution) !== -1) {
         state.geoResolution = metadata.displayDefaults.geoResolution;
       } else if (availableGeoResultions.indexOf(defaultGeoResolution) !== -1) {
@@ -588,10 +605,9 @@ const checkAndCorrectErrorsInState = (state, metadata, query, tree, viewingNarra
 };
 
 const modifyTreeStateVisAndBranchThickness = (oldState, zoomSelected, controlsState, dispatch) => {
-  /* calculate new branch thicknesses & visibility */
+  /* calculate the index of the (in-view) root note, which depends on any selected zoom */
   let newIdxRoot = oldState.idxOfInViewRootNode;
   if (zoomSelected) {
-    // Check and fix old format 'clade=B' - in this case selectionClade is just 'B'
     const [labelName, labelValue] = zoomSelected.split(":");
     const cladeSelectedIdx = getIdxMatchingLabel(oldState.nodes, labelName, labelValue, dispatch);
     oldState.selectedClade = zoomSelected;
@@ -600,6 +616,8 @@ const modifyTreeStateVisAndBranchThickness = (oldState, zoomSelected, controlsSt
     oldState.selectedClade = undefined;
     newIdxRoot = applyInViewNodesToTree(0, oldState);
   }
+
+  /* calculate new branch thicknesses & visibility, as this depends on the root note */
   const visAndThicknessData = calculateVisiblityAndBranchThickness(
     oldState,
     controlsState,
@@ -610,7 +628,7 @@ const modifyTreeStateVisAndBranchThickness = (oldState, zoomSelected, controlsSt
   newState.stateCountAttrs = Object.keys(controlsState.filters);
   newState.idxOfInViewRootNode = newIdxRoot;
   newState.visibleStateCounts = countTraitsAcrossTree(newState.nodes, newState.stateCountAttrs, newState.visibility, true);
-  newState.totalStateCounts   = countTraitsAcrossTree(newState.nodes, newState.stateCountAttrs, false,               true); // eslint-disable-line
+  newState.totalStateCounts   = countTraitsAcrossTree(newState.nodes, newState.stateCountAttrs, false,               true);
 
   return newState;
 };
@@ -740,13 +758,17 @@ export const createStateFromQueryOrJSONs = ({
   query,
   dispatch
 }) => {
-  let tree, treeToo, entropy, controls, metadata, narrative, frequencies;
+  let tree, treeToo, entropy, controls, metadata, narrative, frequencies, measurements;
   /* first task is to create metadata, entropy, controls & tree partial state */
   if (json) {
     /* create metadata state */
     metadata = createMetadataStateFromJSON(json);
     /* entropy state */
     entropy = entropyCreateState(metadata.genomeAnnotations);
+    /* ensure default frequencies state */
+    frequencies = getDefaultFrequenciesState();
+    /* ensure default measurements state */
+    measurements = getDefaultMeasurementsState();
     /* new tree state(s) */
     tree = treeJsonToState(json.tree);
     tree.debug = "LEFT";
@@ -775,7 +797,9 @@ export const createStateFromQueryOrJSONs = ({
     treeToo = {...oldState.treeToo};
     metadata = {...oldState.metadata};
     frequencies = {...oldState.frequencies};
+    measurements = {...oldState.measurements};
     controls = restoreQueryableStateToDefaults(controls);
+    controls = modifyStateViaMetadata(controls, metadata);
   }
 
   /* For the creation of state, we want to parse out URL query parameters
@@ -788,7 +812,7 @@ export const createStateFromQueryOrJSONs = ({
     narrative = narrativeBlocks;
     narrativeSlideIdx = getNarrativePageFromQuery(query, narrative);
     /* replace the query with the information which can guide the view */
-    query = queryString.parse(narrative[narrativeSlideIdx].query); // eslint-disable-line no-param-reassign
+    query = queryString.parse(narrative[narrativeSlideIdx].query);
   }
 
   controls = modifyStateViaURLQuery(controls, query);
@@ -890,9 +914,9 @@ export const createStateFromQueryOrJSONs = ({
   }
 
   /* if narratives then switch the query back to ?n=<SLIDE> for display */
-  if (narrativeBlocks) query = {n: narrativeSlideIdx}; // eslint-disable-line no-param-reassign
+  if (narrativeBlocks) query = {n: narrativeSlideIdx};
 
-  return {tree, treeToo, metadata, entropy, controls, narrative, frequencies, query};
+  return {tree, treeToo, metadata, entropy, controls, narrative, frequencies, measurements, query};
 };
 
 export const createTreeTooState = ({
@@ -902,7 +926,7 @@ export const createTreeTooState = ({
   secondTreeUrl, /* treeToo URL */
   dispatch
 }) => {
-  /* TODO: reconsile choices (filters, colorBys etc) with this new tree */
+  /* TODO: reconcile choices (filters, colorBys etc) with this new tree */
   /* TODO: reconcile query with visibility etc */
   let controls = oldState.controls;
   const tree = Object.assign({}, oldState.tree);

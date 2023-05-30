@@ -96,8 +96,8 @@ function validateUrl(url) {
   if (url===undefined) return undefined; // urls are optional, so return early to avoid the console warning
   try {
     if (typeof url !== "string") throw new Error();
-    if (url.startsWith("http_")) url = url.replace("http_", "http:"); // eslint-disable-line no-param-reassign
-    if (url.startsWith("https_")) url = url.replace("https_", "https:"); // eslint-disable-line no-param-reassign
+    if (url.startsWith("http_")) url = url.replace("http_", "http:");
+    if (url.startsWith("https_")) url = url.replace("https_", "https:");
     const urlObj = new URL(url);
     return urlObj.href;
   } catch (err) {
@@ -129,20 +129,20 @@ export function collectGenotypeStates(nodes) {
 }
 
 /**
- * Collect mutations from node `fromNode` to the root.
- * Reversions (e.g. root -> A<pos>B -> B<pos>A -> fromNode) will not be reported
- * Multiple mutations (e.g. root -> A<pos>B -> B<pos>C -> fromNode) will be represented as A<pos>C
- * We may want to expand this function to take a second argument as the "stopping node"
- * @param {TreeNode} fromNode
+ * Walk from the proivided node back to the root, collecting all mutations as we go.
+ * Multiple mutations (e.g. root -> A<pos>B -> B<pos>C -> fromNode) will be collapsed to as A<pos>C
+ * Reversions to root (e.g. root -> A<pos>B -> B<pos>A -> fromNode) will be reported as A<pos>A
+ * Returned structure is <returnedObject>.<geneName>.<position> = [<from>, <to>]
  */
-export const collectMutations = (fromNode, include_nuc=false) => {
+export const getSeqChanges = (fromNode) => {
   const mutations = {};
   const walk = (n) => {
     if (n.branch_attrs && n.branch_attrs.mutations && Object.keys(n.branch_attrs.mutations).length) {
       Object.entries(n.branch_attrs.mutations).forEach(([gene, muts]) => {
-        if ((gene === "nuc" && include_nuc) || gene !== "nuc") {
+        if ((gene === "nuc") || gene !== "nuc") {
           if (!mutations[gene]) mutations[gene] = {};
           muts.forEach((m) => {
+            /* 'from' is the base closer to the root, 'to' is the more derived base (closer to the tip) */
             const [from, pos, to] = [m.slice(0, 1), m.slice(1, -1), m.slice(-1)]; // note: `pos` is a string
             if (mutations[gene][pos]) {
               mutations[gene][pos][0] = from; // mutation already seen => update ancestral state.
@@ -160,14 +160,157 @@ export const collectMutations = (fromNode, include_nuc=false) => {
     }
   };
   walk(fromNode);
-  // update structure to be returned
-  Object.keys(mutations).forEach((gene) => {
-    mutations[gene] = Object.entries(mutations[gene])
-      .map(([pos, [from, to]]) => {
-        if (from===to) return undefined; // reversion to ancestral (root) state
-        return `${from}${pos}${to}`;
-      })
-      .filter((value) => !!value);
-  });
   return mutations;
+};
+
+
+/**
+ * Categorise each mutation into one or more of the following categories:
+ * (1) undeletions (probably bioinformatics errors, but not always)
+ * (2) gaps
+ * (3) Ns (only applicable for nucleotides)
+ * (4) homoplasies (mutation observed elsewhere on the tree)
+ * (5) unique mutations (those which are only observed once)
+ * (6) reversions to root
+ * Categories 1-5 are mutually exclusive, with the first matching category used.
+ * (e.g. an undeletion is never a homoplasy, even if it occurs multiple times).
+ * Entries in category 6 will also appear in a previous group.
+ */
+export const categoriseMutations = (mutations, observedMutations, seqChangesToRoot) => {
+  const categorisedMutations = {};
+  for (const gene of Object.keys(mutations)) {
+    const categories = { unique: [], homoplasies: [], gaps: [], reversionsToRoot: [], undeletions: []};
+    const isNuc = gene==="nuc";
+    if (isNuc) categories.ns = [];
+    mutations[gene].forEach((mut) => {
+      const oldChar = mut.slice(0, 1);
+      const newChar = mut.slice(-1);
+
+      if (oldChar==="-") { /* undeletions are most probably bioinformatics errors, so collect them into a separate category */
+        categories.undeletions.push(mut);
+      } else if (newChar==="-") {
+        categories.gaps.push(mut);
+      } else if (isNuc && newChar==="N") {
+        categories.ns.push(mut);
+      } else if (observedMutations[`${gene}:${mut}`] > 1) {
+        categories.homoplasies.push(mut);
+      } else {
+        categories.unique.push(mut);
+      }
+      // check to see if this mutation is a reversion to root
+      const pos = mut.slice(1, -1);
+      if (oldChar!=="-" && newChar!=="-" && newChar!=="N" && seqChangesToRoot[gene] &&
+      seqChangesToRoot[gene][pos] && seqChangesToRoot[gene][pos][0]===seqChangesToRoot[gene][pos][1]) {
+        categories.reversionsToRoot.push(mut);
+      }
+    });
+    categorisedMutations[gene]=categories;
+  }
+  return categorisedMutations;
+};
+
+/**
+ * Categorise seq changes (i.e. the accumulated changes between a tip and the (subtree) root)
+ * into the following categories (first matching category used):
+ * (1) gaps
+ * (2) Ns (nucleotides only)
+ * (3) Reversions to root
+ * (4) Base Changes
+ *
+ * TODO: This function shares a lot of logic with `categoriseMutations()` and is thus prone to drift
+ */
+export const categoriseSeqChanges = (seqChangesToRoot) => {
+  const categorisedSeqChanges = {};
+  for (const gene of Object.keys(seqChangesToRoot)) {
+    const categories = { changes: [], gaps: [], reversionsToRoot: []};
+    const isNuc = gene==="nuc";
+    if (isNuc) categories.ns = [];
+    for (const [pos, [from, to]] of Object.entries(seqChangesToRoot[gene])) {
+      const mut = `${from}${pos}${to}`;
+      if (to==="-") {
+        categories.gaps.push(mut);
+      } else if (isNuc && to==="N") {
+        categories.ns.push(mut);
+      } else if (from===to) {
+        categories.reversionsToRoot.push(mut);
+      } else {
+        categories.changes.push(mut);
+      }
+    }
+    categorisedSeqChanges[gene]=categories;
+  }
+  return categorisedSeqChanges;
+};
+
+
+/**
+ * Return the mutations on the branch split into (potentially overlapping) categories
+ * @param {Object} branchNode
+ * @param {Object} observedMutations all observed mutations on the tree
+ * @returns {Object}
+ */
+export const getBranchMutations = (branchNode, observedMutations) => {
+  const mutations = branchNode.branch_attrs && branchNode.branch_attrs.mutations;
+  if (typeof mutations !== "object") return {};
+  const seqChangesToRoot = branchNode.parent===branchNode ? {} : getSeqChanges(branchNode, mutations);
+  const categorisedMutations = categoriseMutations(mutations, observedMutations, seqChangesToRoot);
+  return categorisedMutations;
+};
+
+/**
+ * Return the changes between the terminal node and the root, split into (potentially overlapping) categories
+ * @param {Object} tipNode
+ * @returns {Object}
+ */
+export const getTipChanges = (tipNode) => {
+  const mutations = tipNode.branch_attrs && tipNode.branch_attrs.mutations;
+  const seqChanges = getSeqChanges(tipNode, mutations);
+  const categorisedSeqChanges = categoriseSeqChanges(seqChanges);
+  return categorisedSeqChanges;
+};
+
+/**
+ * Returns a function which will sort a list, where each element in the list
+ * is a gene name. Sorted by start position of the gene, with "nuc" first.
+ */
+export const sortByGeneOrder = (genomeAnnotations) => {
+  if (!(genomeAnnotations instanceof Object)) {
+    return (a, b) => {
+      if (a==="nuc") return -1;
+      if (b==="nuc") return 1;
+      return 0;
+    };
+  }
+  const geneOrder = Object.entries(genomeAnnotations)
+    .sort((a, b) => {
+      if (b[0]==="nuc") return 1; // show nucleotide "gene" first
+      if (a[1].start < b[1].start) return -1;
+      if (a[1].start > b[1].start) return 1;
+      return 0;
+    })
+    .map(([name]) => name);
+
+  return (a, b) => {
+    if (geneOrder.indexOf(a) < geneOrder.indexOf(b)) return -1;
+    if (geneOrder.indexOf(a) > geneOrder.indexOf(b)) return 1;
+    return 0;
+  };
+};
+
+/**
+ * Add extra per-node attrs into the `nodes` data structure. Key clashes will result in the
+ * new data overwriting the existing data
+ * @param {Array} nodes d
+ * @param {Object} newAttrs
+ * @returns undefined - modifies the `nodes` param in-place
+ */
+export const addNodeAttrs = (nodes, newAttrs) => {
+  nodes.forEach((node) => {
+    if (newAttrs[node.name]) {
+      if (!node.node_attrs) node.node_attrs = {};
+      for (const [attrName, attrData] of Object.entries(newAttrs[node.name])) {
+        node.node_attrs[attrName] = attrData;
+      }
+    }
+  });
 };

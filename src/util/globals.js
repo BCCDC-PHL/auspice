@@ -203,6 +203,7 @@ export const isValueValid = (value) => {
 };
 export const strainSymbol = Symbol('strain');
 export const genotypeSymbol = Symbol('genotype');
+export const measurementIdSymbol = Symbol('measurementId');
 
 /**
  * Address to fetch tiles from (including access key).

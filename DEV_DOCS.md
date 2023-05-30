@@ -19,9 +19,27 @@ This project strictly adheres to the [Contributor Covenant Code of Conduct](http
 
 Please see the [project boards](https://github.com/orgs/nextstrain/projects) for currently available issues.
 
-## Contributing code
+## Developer Installation
 
-Code contributions are welcomed! [Please see the main auspice docs](https://nextstrain.github.io/auspice/introduction/install) for details on how to install and run auspice from source.
+This is useful for debugging, modifying the source code, or using an unpublished feature branch.
+
+You can install using your system `npm` or [within a Conda environment](https://docs.nextstrain.org/projects/auspice/en/stable/introduction/install.html#install-dependencies) to keep things isolated.
+
+```sh
+# grab the GitHub auspice repo
+git clone https://github.com/nextstrain/auspice.git
+cd auspice
+
+# install dependencies and build auspice
+npm ci
+
+# make `auspice` available globally
+npm install --global .
+```
+
+Updating Auspice should only require pulling the new version from GitHub - it shouldn't require any `npm` commands. You will, however, have to re-build Auspice whenever the client-related code has changed, via `auspice build`.
+
+## Contributing code
 
 Please comment on an open issue if you are working on it.
 For changes unrelated to an open issue, please make an issue outlining what you would like to change/add.
@@ -98,6 +116,19 @@ Run `npm run lint`. If there are issues run `npm run lint:fix`.
     3. Example: `test/integration/zika.test.js`
 
 
+#### Manual testing
+
+A Heroku pipeline for this repository is connected to GitHub under the nextstrain-bot user account. The Review Apps feature facilitates manual review of changes by automatically creating a test instance from the PR source branch and adding a link to it on the GitHub PR page. These apps are based on configuration in [app.json](./app.json).
+
+#### Test on downstream repositories
+
+Additionally, a GitHub Actions workflow has been set up to generate PRs in downstream repositories that reflect the new changes in Auspice. To use it:
+
+1. Go to [the workflow page](https://github.com/nextstrain/auspice/actions/workflows/make_prs_for_other_repos.yaml).
+2. Select **Run workflow**.
+3. Pick the PR branch, select the downstream repositories you wish to test, and **Run workflow**.
+4. Wait for the workflow to finish running. The Auspice PR should show new reference links from the generated PRs.
+
 ## git-lfs
 
 We use [Git Large File Storage](https://github.com/git-lfs/git-lfs) to manage certain assets.
@@ -111,6 +142,21 @@ git lfs status
 git lfs ls-files # list LFS tracked tiles
 ```
 
+## Typescript
+
+Auspice is in the process of moving to typescript, and currently supports both `.js(x)` and `.ts(x)` files.
+[This guide](https://www.typescriptlang.org/docs/handbook/migrating-from-javascript.html) is helpful to understand the bigger picture of migrating a JS project to TS. 
+Typescript is supposed to help us, so there's no problem using `any` types as we move code from JS to TS, however new code would ideally be typed.
+
+You can check the types via `npm type-check` or run `npm type-check:watch`; alternatively your editor should be able to show this.
+
+Our CI (GitHub action) will type-check the project.
+
+The various moving parts involved are:
+
+* `typescript` (`tsc` command) is used by `npm run type-check` as well as other plugins/libraries
+* `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser` allow ESLint to parse TypeScript syntax
+* `@babel/preset-typescript` is used by babel-loader (via webpack) to parse `.ts(x)` files
 
 ## Contributing to Documentation
 
@@ -118,7 +164,24 @@ The main Nextstrain documentation is available at [docs.nextstrain.org](https://
 
 The Auspice technical reference guide is available at [docs.nextstrain.org/projects/auspice](https://docs.nextstrain.org/projects/auspice/en/stable/index.html). That documentation is built from the files in this repo in the `./docs` folder.
 
-To build the Auspice documentation locally, run `npm run build-docs` and open `docs/_build/html/index.html`.
+To preview the Auspice documentation locally,
+
+1. Create and activate a Conda environment from `docs/environment.yml`. Example using Mamba:
+
+    ```bash
+    mamba env create --file docs/environment.yml
+    conda activate auspice-docs
+    ```
+
+2. Build the docs from a clean slate.
+
+    ```bash
+    make -C docs clean livehtml
+    ```
+
+3. Open the preview link (http://127.0.0.1:8000) in a browser.
+
+Changes to documentation source files (`.md` and `.rst` files under `docs/`) should automatically be reflected upon page refresh.
 
 ## Contributing to Internationalization and Localization (i18n/l18n)
 
@@ -165,4 +228,21 @@ If a translation of a particular string is not yet available, then auspice will 
 
 ## Releases & versioning
 
-New versions are released via the `./releaseNewVersion.sh` script from an up-to-date `master` branch. It will prompt you for the version number increase, push changes to the `release` branch and, as long as Travis-CI is successful then a new version will be automatically published to [npm](https://www.npmjs.com/package/auspice).
+1. Run the `./releaseNewVersion.sh` script from an up-to-date `master` branch. It will prompt you for the version number increase, push changes to the `release` branch and, as long as the GitHub workflow is successful then a new version will be automatically published to [npm](https://www.npmjs.com/package/auspice).
+    - Ensure the [docker-base CI action triggered by nextstrain-bot](https://github.com/nextstrain/docker-base/actions/workflows/ci.yml?query=branch%3Amaster+actor%3Anextstrain-bot) runs successfully.
+2. Update the version on Bioconda:
+    1. [Click to edit the Bioconda recipe](https://github.com/bioconda/bioconda-recipes/edit/master/recipes/auspice/meta.yaml). Or, consider using [the Nextstrain fork](https://github.com/nextstrain/bioconda-recipes) to create PRs that other team members can contribute to.
+    2. Make the following changes:
+        1. Update the version number in the first line.
+        2. Change `source.sha256` to the `sha256` hash of the file at `source.url`. You can get the value using the following command:
+
+            ```sh
+            curl -s https://registry.npmjs.com/auspice/latest \
+                | jq -r ".dist.tarball" \
+                | xargs curl -s \
+                | shasum -a 256 \
+                | cut -f 1 -d " "
+            ```
+
+    3. Click through to create a Pull Request to the Bioconda GitHub repository.
+3. When the new version of Auspice is available on Bioconda, manually run the [conda-base CI workflow](https://github.com/nextstrain/conda-base/actions/workflows/ci.yaml) on the `main` branch.

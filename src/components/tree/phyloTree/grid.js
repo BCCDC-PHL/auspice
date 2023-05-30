@@ -33,10 +33,10 @@ const addSVGGroupsIfNeeded = (groups, svg) => {
       .attr('class', 'temporalWindowEnd');
   }
   if (!("majorGrid" in groups)) {
-    groups.majorGrid = svg.append("g").attr("id", "majorGrid");
+    groups.majorGrid = svg.append("g").attr("id", "majorGrid").attr("clip-path", "url(#treeClip)");
   }
   if (!("minorGrid" in groups)) {
-    groups.minorGrid = svg.append("g").attr("id", "minorGrid");
+    groups.minorGrid = svg.append("g").attr("id", "minorGrid").attr("clip-path", "url(#treeClip)");
   }
   if (!("gridText" in groups)) {
     groups.gridText = svg.append("g").attr("id", "gridText");
@@ -58,7 +58,7 @@ const calculateNumericGridSeparation = (range, minorTicks) => {
   /* make an informed guess of the step size to start with.
   E.g. 0.07 => step of 0.01, 70 => step size of 10 */
   const logRange = Math.floor(Math.log10(range));
-  let majorStep = Math.pow(10, logRange); // eslint-disable-line no-restricted-properties
+  let majorStep = Math.pow(10, logRange);
   if (range/majorStep < 2) { // if step > 0.5*range then make more fine-grained steps
     majorStep /= 5;
   } else if (range/majorStep <5) { // if step > 0.2*range then make more fine grained steps
@@ -141,7 +141,7 @@ const calculateTemporalGridSeperation = (timeRange, pxAvailable) => {
   }
   /* how many of those "units" should ideally fit into each major grid separation? */
   majorStep.n = Math.floor(timeBetweenMajorGrids/levels[majorStep.unit].t) || 1;
-  /* if the numer of units (per major grid) is above the allowed max, use a bigger unit */
+  /* if the number of units (per major grid) is above the allowed max, use a bigger unit */
   if (levels[majorStep.unit].max && majorStep.n > levels[majorStep.unit].max) {
     majorStep.unit = levelsKeys[levelsKeys.indexOf(majorStep.unit)-1];
     majorStep.n = Math.floor(timeBetweenMajorGrids/levels[majorStep.unit].t) || 1;
@@ -409,7 +409,7 @@ export const addGrid = function addGrid() {
         .style("fill", this.params.tickLabelFill)
         .style("text-anchor", "middle")
         .attr("x", Math.abs(this.xScale.range()[1]-this.xScale.range()[0]) / 2)
-        .attr("y", this.yScale.range()[1] + this.params.margins.bottom - 6);
+        .attr("y", parseInt(this.svg.attr("height"), 10) - 1);
   }
   if (yAxisLabel) {
     this.groups.axisText
@@ -453,7 +453,7 @@ export const showTemporalSlice = function showTemporalSlice() {
   const rightHandTree = this.params.orientation[0] === -1;
   const rootXPos = this.xScale(this.nodes[0].x);
   let totalWidth = rightHandTree ? this.xScale.range()[0] : this.xScale.range()[1];
-  totalWidth += (this.params.margins.left + this.params.margins.right);
+  totalWidth += (this.margins.left + this.margins.right);
 
   /* the gray region between the root (ish) and the minimum date */
   if (Math.abs(xWindow[0]-rootXPos) > minPxThreshold) { /* don't render anything less than this num of px */
@@ -488,13 +488,13 @@ export const showTemporalSlice = function showTemporalSlice() {
 
   /* the gray region between the maximum selected date and the last tip */
   let xStart_endRegion = xWindow[1]; // starting X coordinate of the "end" rectangle
-  let width_endRegion = totalWidth - this.params.margins.right - xWindow[1];
+  let width_endRegion = totalWidth - this.margins.right - xWindow[1];
 
-  let transform_endRegion = `translate(${totalWidth - this.params.margins.right},0) scale(-1,1)`;
+  let transform_endRegion = `translate(${totalWidth - this.margins.right},0) scale(-1,1)`;
   // With a right hand tree, the coordinate system flips (right to left)
   if (rightHandTree) {
-    xStart_endRegion = this.params.margins.right;
-    width_endRegion = xWindow[1] - this.params.margins.right;
+    xStart_endRegion = this.margins.right;
+    width_endRegion = xWindow[1] - this.margins.right;
     transform_endRegion = `translate(${xStart_endRegion},0)`;
   }
 

@@ -4,8 +4,8 @@ import { rgb } from "d3-color";
 import LegendItem from "./item";
 import { headerFont, darkGrey } from "../../../globalStyles";
 import { fastTransitionDuration, months } from "../../../util/globals";
+import { getBrighterColor, getColorByTitle } from "../../../util/colorHelpers";
 import { numericToCalendar } from "../../../util/dateHelpers";
-import { isColorByGenotype, decodeColorByGenotype } from "../../../util/getGenotype";
 import { TOGGLE_LEGEND } from "../../../actions/types";
 
 const ITEM_RECT_SIZE = 15;
@@ -60,22 +60,12 @@ class Legend extends React.Component {
     const rowPos = rowIdx * (ITEM_RECT_SIZE + LEGEND_SPACING);
     return `translate(${colPos},${rowPos})`;
   }
-  getTitleString() {
-    if (isColorByGenotype(this.props.colorBy)) {
-      const genotype = decodeColorByGenotype(this.props.colorBy);
-      return genotype.aa
-        ? `Genotype at ${genotype.gene} site ${genotype.positions.join(", ")}`
-        : `Nucleotide at position ${genotype.positions.join(", ")}`;
-    }
-    return this.props.colorings[this.props.colorBy] === undefined ?
-      "" : this.props.colorings[this.props.colorBy].title;
-  }
 
   getTitleWidth() {
     // This is a hack because we can't use getBBox in React.
     // Lots of work to get measured width of DOM element.
     // Works fine, but will need adjusting if title font is changed.
-    return 15 + 5.3 * this.getTitleString().length;
+    return 15 + 5.3 * getColorByTitle(this.props.colorings, this.props.colorBy).length;
   }
 
   toggleLegend() {
@@ -100,7 +90,7 @@ class Legend extends React.Component {
             backgroundColor: "#fff"
           }}
         >
-          {this.getTitleString()}
+          {getColorByTitle(this.props.colorings, this.props.colorBy)}
         </text>
       </g>
     );
@@ -137,7 +127,7 @@ class Legend extends React.Component {
       return this.props.colorScale.legendLabels.get(label);
     }
     /* depending on the colorBy, we display different labels! */
-    if (this.props.colorBy === "num_date") {
+    if (this.props.colorBy === "num_date" || this.props.colorScale.scaleType==="temporal") {
       const legendValues = this.props.colorScale.visibleLegendValues;
       if (
         (legendValues[legendValues.length-1] - legendValues[0] > 10) && /* range spans more than 10 years */
@@ -145,7 +135,7 @@ class Legend extends React.Component {
       ) {
         return parseInt(label, 10);
       }
-      const [yyyy, mm, dd] = numericToCalendar(label).split('-'); // eslint-disable-line
+      const [yyyy, mm, _dd] = numericToCalendar(label).split('-');
       return `${months[mm]} ${yyyy}`;
     }
     return label;
@@ -166,10 +156,10 @@ class Legend extends React.Component {
             dispatch={this.props.dispatch}
             legendRectSize={ITEM_RECT_SIZE}
             legendSpacing={LEGEND_SPACING}
-            rectFill={rgb(this.props.colorScale.scale(d)).brighter([0.35]).toString()}
+            rectFill={getBrighterColor(this.props.colorScale.scale(d))}
             rectStroke={rgb(this.props.colorScale.scale(d)).toString()}
             transform={this.getTransformationForLegendItem(maxNumPerColumn, i)}
-            key={d}
+            key={this.props.colorScale.colorBy+d+i /* eslint-disable-line react/no-array-index-key */}
             value={d}
             label={this.styleLabelText(d)}
             index={i}
@@ -223,7 +213,7 @@ class Legend extends React.Component {
   }
 
   render() {
-    // catch the case where we try to render before anythings ready
+    // catch the case where we try to render before anything's ready
     if (!this.props.colorScale) return null;
     return (
       <svg

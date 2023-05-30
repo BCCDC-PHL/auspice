@@ -1,5 +1,4 @@
 import { createDefaultParams } from "./defaultParams";
-import { createChildrenAndParentsReturnNumTips, setYValues } from "./helpers";
 import { change, modifySVG, modifySVGInStages } from "./change";
 
 /* PROTOTYPES */
@@ -8,6 +7,7 @@ import * as layouts from "./layouts";
 import * as grid from "./grid";
 import * as confidence from "./confidence";
 import * as labels from "./labels";
+import * as regression from "./regression";
 
 /* phylogenetic tree drawing function - the actual tree is rendered by the render prototype */
 const PhyloTree = function PhyloTree(reduxNodes, id, idxOfInViewRootNode) {
@@ -29,14 +29,11 @@ const PhyloTree = function PhyloTree(reduxNodes, id, idxOfInViewRootNode) {
       n: d, /* a back link to the redux node */
       x: 0,
       y: 0,
-      terminal: (typeof d.children === "undefined"),
       inView: d.inView !== undefined ? d.inView : true /* each node is visible, unless set earlier! */
     };
     d.shell = phyloNode; /* set the link from the redux node to the phylotree node */
     return phyloNode;
   });
-  this.numberOfTips = createChildrenAndParentsReturnNumTips(this.nodes);
-  setYValues(this.nodes);
   this.zoomNode = this.nodes[idxOfInViewRootNode];
   this.strainToNode = {};
   this.nodes.forEach((phylonode) => {this.strainToNode[phylonode.n.name] = phylonode;});
@@ -55,6 +52,7 @@ PhyloTree.prototype.render = renderers.render;
 PhyloTree.prototype.clearSVG = renderers.clearSVG;
 
 /* D R A W I N G    F U N C T I O N S */
+PhyloTree.prototype.setClipMask = renderers.setClipMask;
 PhyloTree.prototype.drawTips = renderers.drawTips;
 PhyloTree.prototype.drawBranches = renderers.drawBranches;
 PhyloTree.prototype.drawVaccines = renderers.drawVaccines;
@@ -71,6 +69,7 @@ PhyloTree.prototype.unrootedLayout = layouts.unrootedLayout;
 PhyloTree.prototype.radialLayout = layouts.radialLayout;
 PhyloTree.prototype.setScales = layouts.setScales;
 PhyloTree.prototype.mapToScreen = layouts.mapToScreen;
+PhyloTree.prototype.calculateRegression = regression.calculateRegression;
 
 /* C O N F I D E N C E    I N T E R V A L S */
 PhyloTree.prototype.removeConfidence = confidence.removeConfidence;

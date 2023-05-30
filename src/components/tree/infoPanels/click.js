@@ -3,7 +3,8 @@ import { isValueValid } from "../../../util/globals";
 import { infoPanelStyles } from "../../../globalStyles";
 import { numericToCalendar } from "../../../util/dateHelpers";
 import { getTraitFromNode, getFullAuthorInfoFromNode, getVaccineFromNode,
-  getAccessionFromNode, getUrlFromNode, collectMutations } from "../../../util/treeMiscHelpers";
+  getAccessionFromNode, getUrlFromNode } from "../../../util/treeMiscHelpers";
+import { MutationTable } from "./MutationTable";
 
 export const styles = {
   container: {
@@ -25,7 +26,7 @@ export const styles = {
 };
 
 export const stopProp = (e) => {
-  if (!e) {e = window.event;} // eslint-disable-line no-param-reassign
+  if (!e) {e = window.event;}
   e.cancelBubble = true;
   if (e.stopPropagation) {e.stopPropagation();}
 };
@@ -51,41 +52,6 @@ const Link = ({url, title, value}) => (
   </tr>
 );
 
-/**
- * Render a 2-column table of gene -> mutations.
- * Rows are sorted by gene name, alphabetically, with "nuc" last.
- * Mutations are sorted by genomic position.
- * todo: sort genes by position in genome
- * todo: provide in-app links from mutations to color-bys? filters?
- */
-const MutationTable = ({mutations}) => {
-  const geneSortFn = (a, b) => {
-    if (a[0]==="nuc") return 1;
-    if (b[0]==="nuc") return -1;
-    return a[0]<b[0] ? -1 : 1;
-  };
-  const mutSortFn = (a, b) => {
-    const [aa, bb] = [parseInt(a.slice(1, -1), 10), parseInt(b.slice(1, -1), 10)];
-    return aa<bb ? -1 : 1;
-  };
-  // we encode the table here (rather than via `item()`) to set component keys appropriately
-  return (
-    <tr key={"Mutations"}>
-      <th style={infoPanelStyles.item}>{"Mutations from root"}</th>
-      <td style={infoPanelStyles.item}>{
-        Object.entries(mutations)
-          .sort(geneSortFn)
-          .map(([gene, muts]) => (
-            <div style={{...infoPanelStyles.item, ...{fontWeight: 300}}}>
-              {gene}: {muts.sort(mutSortFn).join(", ")}
-            </div>
-          ))
-      }</td>
-    </tr>
-  );
-};
-
-
 const AccessionAndUrl = ({node}) => {
   /* If `gisaid_epi_isl` or `genbank_accession` exist as node attrs, these preempt normal use of `accession` and `url`.
   These special values were introduced during the SARS-CoV-2 pandemic. */
@@ -94,11 +60,12 @@ const AccessionAndUrl = ({node}) => {
   let gisaid_epi_isl_url = null;
   let genbank_accession_url = null;
   if (isValueValid(gisaid_epi_isl)) {
-    const gisaid_epi_isl_number = gisaid_epi_isl.split("_")[2];
-    // slice has to count from the end of the string rather than the beginning to deal with EPI ISLs of different lengths, eg
-    // https://www.epicov.org/acknowledgement/67/98/EPI_ISL_406798.json
-    // https://www.epicov.org/acknowledgement/99/98/EPI_ISL_2839998.json
-    if (gisaid_epi_isl_number.length > 4) {
+    const gisaid_accession_regex = new RegExp('EPI_ISL_[0-9]{5,}');
+    if (gisaid_accession_regex.test(gisaid_epi_isl)) {
+      const gisaid_epi_isl_number = gisaid_epi_isl.split("_")[2];
+      // slice has to count from the end of the string rather than the beginning to deal with EPI ISLs of different lengths, eg
+      // https://www.epicov.org/acknowledgement/67/98/EPI_ISL_406798.json
+      // https://www.epicov.org/acknowledgement/99/98/EPI_ISL_2839998.json
       gisaid_epi_isl_url = "https://www.epicov.org/acknowledgement/" + gisaid_epi_isl_number.slice(-4, -2) + "/" + gisaid_epi_isl_number.slice(-2) + "/" + gisaid_epi_isl + ".json";
     } else {
       gisaid_epi_isl_url = "https://gisaid.org";
@@ -204,7 +171,7 @@ const StrainName = ({children}) => (
   <p style={infoPanelStyles.modalHeading}>{children}</p>
 );
 
-const SampleDate = ({node, t}) => {
+const SampleDate = ({isTerminal, node, t}) => {
   const date = getTraitFromNode(node, "num_date");
   if (!date) return null;
 
@@ -212,13 +179,13 @@ const SampleDate = ({node, t}) => {
   if (date && dateUncertainty && dateUncertainty[0] !== dateUncertainty[1]) {
     return (
       <>
-        {item(t("Inferred collection date"), numericToCalendar(date))}
+        {item(t(isTerminal ? "Inferred collection date" : "Inferred date"), numericToCalendar(date))}
         {item(t("Date Confidence Interval"), `(${numericToCalendar(dateUncertainty[0])}, ${numericToCalendar(dateUncertainty[1])})`)}
       </>
     );
   }
-
-  return item(t("Collection date"), numericToCalendar(date));
+  /* internal nodes are always inferred, regardless of whether uncertainty bounds are present */
+  return item(t(isTerminal ? "Collection date" : "Inferred date"), numericToCalendar(date));
 };
 
 const getTraitsToDisplay = (node) => {
@@ -228,19 +195,34 @@ const getTraitsToDisplay = (node) => {
   return Object.keys(node.node_attrs).filter((k) => !ignore.includes(k));
 };
 
-const Trait = ({node, trait, colorings}) => {
-  const value_tmp = getTraitFromNode(node, trait);
-  let value = value_tmp;
-  if (typeof value_tmp === "number") {
-    if (!Number.isInteger(value_tmp)) {
-      value = Number.parseFloat(value_tmp).toPrecision(3);
+const Trait = ({node, trait, colorings, isTerminal}) => {
+  let value = getTraitFromNode(node, trait);
+  const confidence = getTraitFromNode(node, trait, {confidence: true});
+  const isTemporal = colorings[trait]?.type==="temporal";
+
+  if (typeof value === "number" && !isTemporal) {
+    if (!Number.isInteger(value)) {
+      value = Number.parseFloat(value).toPrecision(3);
     }
   }
   if (!isValueValid(value)) return null;
 
+  if (confidence && value in confidence) {
+    /* if it's a tip with one confidence value > 0.99 then we interpret this as a known (i.e. not inferred) state */
+    if (!isTerminal || confidence[value]<0.99) {
+      value = `${value} (${(100 * confidence[value]).toFixed(0)}%)`;
+    }
+  }
+
   const name = (colorings && colorings[trait] && colorings[trait].title) ?
     colorings[trait].title :
     trait;
+
+  /* case where the colorScale is temporal */
+  if (isTemporal && typeof value === "number") {
+    return item(name, numericToCalendar(value));
+  }
+
   const url = getUrlFromNode(node, trait);
   if (url) {
     return <Link title={name} url={url} value={value}/>;
@@ -255,29 +237,39 @@ const Trait = ({node, trait, colorings}) => {
  * @param  {function} props.goAwayCallback
  * @param  {object}   props.colorings
  */
-const TipClickedPanel = ({tip, goAwayCallback, colorings, t}) => {
-  if (!tip) {return null;}
+const NodeClickedPanel = ({selectedNode, clearSelectedNode, colorings, observedMutations, geneSortFn, t}) => {
+  if (selectedNode.event!=="click") {return null;}
   const panelStyle = { ...infoPanelStyles.panel};
   panelStyle.maxHeight = "70%";
-  const node = tip.n;
-  const mutationsToRoot = collectMutations(node);
+  const node = selectedNode.node.n;
+  const isTip = selectedNode.type === "tip";
+  const isTerminal = node.fullTipCount===1;
+
+  const title = isTip ?
+    node.name :
+    isTerminal ?
+      `Branch leading to ${node.name}` :
+      "Internal branch";
+
   return (
-    <div style={infoPanelStyles.modalContainer} onClick={() => goAwayCallback(tip)}>
+    <div style={infoPanelStyles.modalContainer} onClick={() => clearSelectedNode(selectedNode)}>
       <div className={"panel"} style={panelStyle} onClick={(e) => stopProp(e)}>
-        <StrainName>{node.name}</StrainName>
+        <StrainName>{title}</StrainName>
         <table>
           <tbody>
-            <VaccineInfo node={node} t={t}/>
-            <SampleDate node={node} t={t}/>
-            <PublicationInfo node={node} t={t}/>
+            {!isTip && item(t("Number of terminal tips"), node.fullTipCount)}
+            {isTip && <VaccineInfo node={node} t={t}/>}
+            <SampleDate isTerminal={isTerminal} node={node} t={t}/>
+            {!isTip && item("Node name", node.name)}
+            {isTip && <PublicationInfo node={node} t={t}/>}
             {getTraitsToDisplay(node).map((trait) => (
-              <Trait node={node} trait={trait} colorings={colorings} key={trait}/>
+              <Trait node={node} trait={trait} colorings={colorings} key={trait} isTerminal={isTerminal}/>
             ))}
-            <AccessionAndUrl node={node}/>
+            {isTip && <AccessionAndUrl node={node}/>}
             {item("", "")}
-            <MutationTable mutations={mutationsToRoot}/>
           </tbody>
         </table>
+        <MutationTable node={node} geneSortFn={geneSortFn} isTip={isTip} observedMutations={observedMutations}/>
         <p style={infoPanelStyles.comment}>
           {t("Click outside this box to go back to the tree")}
         </p>
@@ -286,4 +278,4 @@ const TipClickedPanel = ({tip, goAwayCallback, colorings, t}) => {
   );
 };
 
-export default TipClickedPanel;
+export default NodeClickedPanel;

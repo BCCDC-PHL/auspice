@@ -1,13 +1,13 @@
 import React from "react";
 import PropTypes from 'prop-types';
 import { connect } from "react-redux";
-import Select from "react-select/lib/Select";
 import { debounce } from "lodash";
 import { sidebarField } from "../../globalStyles";
 import { controlsWidth, nucleotide_gene } from "../../util/globals";
 import { changeColorBy } from "../../actions/colors";
 import { analyticsControlsEvent } from "../../util/googleAnalytics";
 import { isColorByGenotype, decodeColorByGenotype, encodeColorByGenotype, decodePositions } from "../../util/getGenotype";
+import CustomSelect from "./customSelect";
 
 /* the reason why we have colorBy as state (here) and in redux
    is for the case where we select genotype, then wait for the
@@ -58,7 +58,7 @@ class ColorBy extends React.Component {
   // Applies the given state to the immutable blank state and replaces the
   // current state with the result.
   replaceState(state) {
-    this.setState((oldState, props) => this.newState(state)); // eslint-disable-line no-unused-vars
+    this.setState((_oldState, _props) => this.newState(state));
   }
 
   newState(state) {
@@ -69,7 +69,7 @@ class ColorBy extends React.Component {
   }
 
   // State from the outside world enters via props.
-  componentWillReceiveProps(nextProps) {
+  UNSAFE_componentWillReceiveProps(nextProps) {
     if (this.props.colorBy !== nextProps.colorBy) {
       if (isColorByGenotype(nextProps.colorBy)) {
         const genotype = decodeColorByGenotype(nextProps.colorBy);
@@ -136,10 +136,12 @@ class ColorBy extends React.Component {
   }, 400);
 
   getGtGeneOptions() {
-    let options = [];
+    const options = [];
     if (this.props.geneMap) {
-      options = Object.keys(this.props.geneMap).map((prot) => ({value: prot, label: prot}));
-      options[options.length] = {value: nucleotide_gene, label: "nucleotide"};
+      // Make the nucleotide the first option since it can be annoying to find the nucleotide
+      // option when there are ~200 genes like in monkeypox.
+      options.push({value: nucleotide_gene, label: "nucleotide"});
+      Object.keys(this.props.geneMap).forEach((prot) => options.push({value: prot, label: prot}));
     }
     return options;
   }
@@ -147,15 +149,15 @@ class ColorBy extends React.Component {
   gtGeneSelect() {
     const gtGeneOptions = this.getGtGeneOptions();
     return (
-      <Select
+      <CustomSelect
         name="selectGenotype"
         id="selectGenotype"
         placeholder="gene…"
-        value={this.state.geneSelected}
+        value={gtGeneOptions.filter(({value}) => value === this.state.geneSelected)}
         options={gtGeneOptions}
-        clearable={false}
-        searchable
-        multi={false}
+        isClearable={false}
+        isSearchable
+        isMulti={false}
         onChange={(opt) => {
           this.setState({ geneSelected: opt.value });
         }}
@@ -208,13 +210,13 @@ class ColorBy extends React.Component {
 
     return (
       <div style={styles.base} id="selectColorBy">
-        <Select
+        <CustomSelect
           name="selectColorBy"
-          value={this.state.colorBySelected}
+          value={colorOptions.filter(({value}) => value === this.state.colorBySelected)}
           options={colorOptions}
-          clearable={false}
-          searchable={false}
-          multi={false}
+          isClearable={false}
+          isSearchable
+          isMulti={false}
           onChange={(opt) => {
             this.replaceState({ colorBySelected: opt.value });
           }}

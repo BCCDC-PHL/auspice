@@ -3,13 +3,13 @@ import PropTypes from 'prop-types';
 import { connect } from "react-redux";
 import styled, { withTheme } from 'styled-components';
 import { withTranslation } from 'react-i18next';
-import Select from "react-select/lib/Select";
 import * as icons from "../framework/svg-icons";
 import { controlsWidth } from "../../util/globals";
 import { collectAvailableScatterVariables} from "../../util/scatterplotHelpers";
 import { SidebarSubtitle, SidebarButton } from "./styles";
 import { changeLayout } from "../../actions/layout";
 import Toggle from "./toggle";
+import CustomSelect from "./customSelect";
 
 
 const RectangularTreeIcon = withTheme(icons.RectangularTree);
@@ -20,6 +20,36 @@ const ScatterIcon = withTheme(icons.Scatter);
 
 export const RowContainer = styled.div`
   padding: 0px 5px 1px 5px;
+`;
+
+const ScatterVariableContainer = styled.div`
+  display: flex;
+  flex-direction: row;
+  align-content: stretch;
+  flex-wrap: nowrap;
+  height: 100%;
+  order: 0;
+  flex-grow: 0;
+  flex-shrink: 1;
+  flex-basis: auto;
+  align-self: auto;
+  padding: ${(props) => props.padAbove?"2":"0"}px 0px 2px 15px;
+`;
+
+const ScatterAxisName = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 18px;
+  font-size: 14px;
+  font-weight: 400;
+  font-family: ${(props) => props.theme["font-family"]};
+  color: ${(props) => props.theme.color};
+`;
+
+const ScatterSelectContainer = styled.div`
+  width: ${controlsWidth-18}px;
+  font-size: 12px;
 `;
 
 @connect((state) => {
@@ -41,16 +71,16 @@ class ChooseLayout extends React.Component {
     const options = collectAvailableScatterVariables(this.props.colorings, this.props.colorBy);
     const selectedX = options.filter((o) => o.value===this.props.scatterVariables.x)[0];
     const selectedY = options.filter((o) => o.value===this.props.scatterVariables.y)[0];
-    const miscSelectProps = {options, clearable: false, searchable: false, multi: false, valueKey: "label"};
+    const miscSelectProps = {options, isClearable: false, isSearchable: false, isMulti: false};
 
     return (
       <>
         <ScatterVariableContainer>
           <ScatterAxisName>x</ScatterAxisName>
           <ScatterSelectContainer>
-            <Select
+            <CustomSelect
               {...miscSelectProps}
-              value={selectedX}
+              value={options.filter(({value}) => value === selectedX.value)}
               onChange={(value) => this.props.dispatch(changeLayout({x: value.value, xLabel: value.label}))}
             />
           </ScatterSelectContainer>
@@ -59,9 +89,9 @@ class ChooseLayout extends React.Component {
         <ScatterVariableContainer>
           <ScatterAxisName>y</ScatterAxisName>
           <ScatterSelectContainer>
-            <Select
+            <CustomSelect
               {...miscSelectProps}
-              value={selectedY}
+              value={options.filter(({value}) => value === selectedY.value)}
               onChange={(value) => this.props.dispatch(changeLayout({y: value.value, yLabel: value.label}))}
             />
           </ScatterSelectContainer>
@@ -171,33 +201,3 @@ class ChooseLayout extends React.Component {
 const WithTranslation = withTranslation()(ChooseLayout);
 export default WithTranslation;
 
-
-const ScatterVariableContainer = styled.div`
-  display: flex;
-  flex-direction: row;
-  align-content: stretch;
-  flex-wrap: nowrap;
-  height: 100%;
-  order: 0;
-  flex-grow: 0;
-  flex-shrink: 1;
-  flex-basis: auto;
-  align-self: auto;
-  padding: ${(props) => props.padAbove?"2":"0"}px 0px 2px 15px;
-`;
-
-const ScatterAxisName = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 18px;
-  font-size: 14px;
-  font-weight: 400;
-  font-family: ${(props) => props.theme["font-family"]};
-  color: ${(props) => props.theme.color};
-`;
-
-const ScatterSelectContainer = styled.div`
-  width: ${controlsWidth-18}px;
-  font-size: 12px;
-`;

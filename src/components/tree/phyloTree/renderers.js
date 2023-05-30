@@ -1,6 +1,6 @@
 import { timerStart, timerEnd } from "../../../util/perf";
 import { NODE_VISIBLE } from "../../../util/globals";
-import { getDomId } from "./helpers";
+import { getDomId, setDisplayOrder } from "./helpers";
 import { makeRegressionText } from "./regression";
 import { getEmphasizedColor } from "../../../util/colorHelpers";
 /**
@@ -29,11 +29,6 @@ export const render = function render(svg, layout, distance, parameters, callbac
   this.vaccines = vaccines ? vaccines.map((d) => d.shell) : undefined;
   this.dateRange = dateRange;
 
-  /* set x, y values & scale them to the screen */
-  this.setDistance(distance);
-  this.setLayout(layout, scatterVariables);
-  this.mapToScreen();
-
   /* set nodes stroke / fill */
   this.nodes.forEach((d, i) => {
     d.branchStroke = branchStroke[i];
@@ -44,7 +39,14 @@ export const render = function render(svg, layout, distance, parameters, callbac
     d.r = tipRadii ? tipRadii[i] : this.params.tipRadius;
   });
 
+  /* set x, y values & scale them to the screen */
+  setDisplayOrder(this.nodes);
+  this.setDistance(distance);
+  this.setLayout(layout, scatterVariables);
+  this.mapToScreen();
+
   /* draw functions */
+  this.setClipMask();
   if (this.params.showGrid) {
     this.addGrid();
     this.showTemporalSlice();
@@ -97,13 +99,12 @@ export const drawVaccines = function drawVaccines() {
 export const drawTips = function drawTips() {
   timerStart("drawTips");
   const params = this.params;
-
   if (!("tips" in this.groups)) {
-    this.groups.tips = this.svg.append("g").attr("id", "tips");
+    this.groups.tips = this.svg.append("g").attr("id", "tips").attr("clip-path", "url(#treeClip)");
   }
   this.groups.tips
     .selectAll(".tip")
-    .data(this.nodes.filter((d) => d.terminal))
+    .data(this.nodes.filter((d) => !d.n.hasChildren))
     .enter()
     .append("circle")
     .attr("class", "tip")
@@ -149,7 +150,7 @@ export const getBranchVisibility = (d) => {
  * @param {obj} d node
  * @param {string} b branch type -- either "T" (tee) or "S" (stem)
  */
-export const strokeForBranch = (d, b) => { // eslint-disable-line
+export const strokeForBranch = (d, _b) => {
   /* Due to errors rendering gradients on SVG branches on some browsers/OSs which would
   cause the branches to not appear, we're falling back to the previous solution which
   doesn't use gradients. The commented code remains & hopefully a solution can be
@@ -173,14 +174,14 @@ export const drawBranches = function drawBranches() {
   /* PART 1: draw the branch Ts (i.e. the bit connecting nodes parent branch ends to child branch beginnings)
   Only rectangular & radial trees have this, so we remove it for clock / unrooted layouts */
   if (!("branchTee" in this.groups)) {
-    this.groups.branchTee = this.svg.append("g").attr("id", "branchTee");
+    this.groups.branchTee = this.svg.append("g").attr("id", "branchTee").attr("clip-path", "url(#treeClip)");
   }
   if (this.layout === "clock" || this.layout === "scatter" || this.layout === "unrooted") {
     this.groups.branchTee.selectAll("*").remove();
   } else {
     this.groups.branchTee
       .selectAll('.branch')
-      .data(this.nodes.filter((d) => !d.terminal))
+      .data(this.nodes.filter((d) => d.n.hasChildren))
       .enter()
       .append("path")
       .attr("class", "branch T")
@@ -188,6 +189,7 @@ export const drawBranches = function drawBranches() {
       .attr("d", (d) => d.branch[1])
       .style("stroke", (d) => d.branchStroke || params.branchStroke)
       .style("stroke-width", (d) => d['stroke-width'] || params.branchStrokeWidth)
+      .style("visibility", getBranchVisibility)
       .style("fill", "none")
       .style("pointer-events", "auto")
       .on("mouseover", this.callbacks.onBranchHover)
@@ -207,7 +209,7 @@ export const drawBranches = function drawBranches() {
   this.updateColorBy();
   /* PART 2b: Draw the stems */
   if (!("branchStem" in this.groups)) {
-    this.groups.branchStem = this.svg.append("g").attr("id", "branchStem");
+    this.groups.branchStem = this.svg.append("g").attr("id", "branchStem").attr("clip-path", "url(#treeClip)");
   }
   this.groups.branchStem
     .selectAll('.branch')
@@ -239,6 +241,11 @@ export const drawBranches = function drawBranches() {
  * @return {null}
  */
 export const drawRegression = function drawRegression() {
+  /* check we have computed a sensible regression before attempting to draw */
+  if (this.regression.slope===undefined) {
+    return;
+  }
+
   const leftY = this.yScale(this.regression.intercept + this.xScale.domain()[0] * this.regression.slope);
   const rightY = this.yScale(this.regression.intercept + this.xScale.domain()[1] * this.regression.slope);
 
@@ -246,7 +253,7 @@ export const drawRegression = function drawRegression() {
     " L " + this.xScale.range()[1].toString() + " " + rightY.toString();
 
   if (!("regression" in this.groups)) {
-    this.groups.regression = this.svg.append("g").attr("id", "regression");
+    this.groups.regression = this.svg.append("g").attr("id", "regression").attr("clip-path", "url(#treeClip)");
   }
 
   this.groups.regression
@@ -290,6 +297,7 @@ export const clearSVG = function clearSVG() {
 cause the branches to not appear, we're falling back to the previous solution which
 doesn't use gradients. Calls to `updateColorBy` are therefore unnecessary.
                                                                 James, April 4 2020. */
+// eslint-disable-next-line @typescript-eslint/no-empty-function
 export const updateColorBy = function updateColorBy() {};
 // export const updateColorBy = function updateColorBy() {
 //   // console.log("updating colorBy")
@@ -329,14 +337,13 @@ export const updateColorBy = function updateColorBy() {};
 /** given a node `d` which is being hovered, update it's colour to emphasize
  * that it's being hovered. This updates the SVG element stroke style in-place
  * _or_ updates the SVG gradient def in place.
- * @param {obj} d node
+ * @param {PhyloNode} d node
  * @param {string} c1 colour of the parent (start of the branch)
  * @param {string} c2 colour of the node (end of the branch)
  */
 const handleBranchHoverColor = (d, c1, c2) => {
   if (!d) { return; }
-
-  const id = `T${d.that.id}_${d.parent.n.arrayIdx}_${d.n.arrayIdx}`;
+  const id = `T${d.that.id}_${d.n.parent.arrayIdx}_${d.n.arrayIdx}`;
 
   /* We want to emphasize the colour of the branch. How we do this depends on how the branch was rendered in the first place! */
   const tel = d.that.svg.select(getDomId("#branchT", d.n.name));
@@ -346,7 +353,7 @@ const handleBranchHoverColor = (d, c1, c2) => {
   }
   const sel = d.that.svg.select(getDomId("#branchS", d.n.name));
   if (!sel.empty()) {
-    if (d.branchStroke === d.parent.branchStroke) {
+    if (d.branchStroke === d.n.parent.shell.branchStroke) {
       sel.style("stroke", c2);
     } else {
       // console.log("going to gradient " + el.attr("id"));
@@ -364,10 +371,41 @@ const handleBranchHoverColor = (d, c1, c2) => {
 
 export const branchStrokeForLeave = function branchStrokeForLeave(d) {
   if (!d) { return; }
-  handleBranchHoverColor(d, d.parent.branchStroke, d.branchStroke);
+  handleBranchHoverColor(d, d.n.parent.shell.branchStroke, d.branchStroke);
 };
 
 export const branchStrokeForHover = function branchStrokeForHover(d) {
   if (!d) { return; }
-  handleBranchHoverColor(d, getEmphasizedColor(d.parent.branchStroke), getEmphasizedColor(d.branchStroke));
+  handleBranchHoverColor(d, getEmphasizedColor(d.n.parent.shell.branchStroke), getEmphasizedColor(d.branchStroke));
+};
+
+/**
+ * Create / update the clipping mask which is attached to branches, tips, branch-labels
+ * and regression lines. In theory, we can clip to exactly the {xy}Scale range, however
+ * in practice, elements (or portions of elements) render outside this.
+ */
+export const setClipMask = function setClipMask() {
+  const [xMin, xMax, yMin, yMax] = [...this.xScale.range(), ...this.yScale.range()];
+  const x0 = xMin - 5;
+  const width = xMax - xMin + 20;  // RHS overflow is not problematic
+  const y0 = yMin - 15;            // some overflow at top is ok
+  const height = yMax - yMin + 20; // extra padding to allow tips & lowest major axis line to render
+
+  if (!this.groups.clipPath) {
+    this.groups.clipPath = this.svg.append("g").attr("id", "clipGroup");
+    this.groups.clipPath.append("clipPath")
+        .attr("id", "treeClip")
+      .append("rect")
+        .attr("x", x0)
+        .attr("y", y0)
+        .attr("width", width)
+        .attr("height", height);
+  } else {
+    this.groups.clipPath.select('rect')
+      .attr("x", x0)
+      .attr("y", y0)
+      .attr("width", width)
+      .attr("height", height);
+  }
+
 };

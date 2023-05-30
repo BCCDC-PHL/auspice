@@ -1,6 +1,6 @@
 import { timerFlush } from "d3-timer";
 import { calcConfidenceWidth } from "./confidence";
-import { applyToChildren } from "./helpers";
+import { applyToChildren, setDisplayOrder } from "./helpers";
 import { timerStart, timerEnd } from "../../../util/perf";
 import { NODE_VISIBLE } from "../../../util/globals";
 import { getBranchVisibility, strokeForBranch } from "./renderers";
@@ -15,7 +15,7 @@ const updateNodesWithNewData = (nodes, newNodeProps) => {
   // let tmp = 0;
   nodes.forEach((d, i) => {
     d.update = false;
-    for (let key in newNodeProps) { // eslint-disable-line
+    for (const key in newNodeProps) {
       const val = newNodeProps[key][i];
       if (val !== d[key]) {
         d[key] = val;
@@ -219,6 +219,7 @@ export const modifySVGInStages = function modifySVGInStages(elemsToUpdate, svgPr
   /* STEP 2: move tips */
   const step2 = () => {
     if (!--inProgress) { /* decrement counter. When hits 0 run block */
+      this.setClipMask();
       const updateTips = createUpdateCall(".tip", svgPropsToUpdate);
       genericSelectAndModify(this.svg, ".tip", updateTips, transitionTimeMoveTips);
       setTimeout(step3, transitionTimeMoveTips);
@@ -253,11 +254,13 @@ export const change = function change({
   zoomIntoClade = false,
   svgHasChangedDimensions = false,
   animationInProgress = false,
+  changeNodeOrder = false,
   /* change these things to provided value (unless undefined) */
   newDistance = undefined,
   newLayout = undefined,
   updateLayout = undefined, // todo - this seems identical to `newLayout`
   newBranchLabellingKey = undefined,
+  showAllBranchLabels = undefined,
   newTipLabelKey = undefined,
   /* arrays of data (the same length as nodes) */
   branchStroke = undefined,
@@ -310,13 +313,18 @@ export const change = function change({
     svgPropsToUpdate.add("stroke-width");
     nodePropsToModify["stroke-width"] = branchThickness;
   }
-  if (newDistance || newLayout || updateLayout || zoomIntoClade || svgHasChangedDimensions) {
+  if (newDistance || newLayout || updateLayout || zoomIntoClade || svgHasChangedDimensions || changeNodeOrder) {
     elemsToUpdate.add(".tip").add(".branch.S").add(".branch.T").add(".branch");
     elemsToUpdate.add(".vaccineCross").add(".vaccineDottedLine").add(".conf");
     elemsToUpdate.add('.branchLabel').add('.tipLabel');
     elemsToUpdate.add(".grid").add(".regression");
     svgPropsToUpdate.add("cx").add("cy").add("d").add("opacity")
       .add("visibility");
+  }
+
+  if (changeNodeOrder) {
+    setDisplayOrder(this.nodes);
+    this.setDistance();
   }
 
   /* change the requested properties on the nodes */
@@ -326,6 +334,11 @@ export const change = function change({
   if (changeColorBy) {
     this.updateColorBy();
   }
+  // recalculate existing regression if needed
+  if (changeVisibility && this.regression) {
+    elemsToUpdate.add(".regression");
+    this.calculateRegression(); // Note: must come after `updateNodesWithNewData()`
+  }
   /* some things need to update d.inView and/or d.update. This should be centralised */
   /* TODO: list all functions which modify these */
   if (zoomIntoClade) { /* must happen below updateNodesWithNewData */
@@ -334,10 +347,12 @@ export const change = function change({
       d.update = true;
     });
     /* if clade is terminal, use the parent as the zoom node */
-    this.zoomNode = zoomIntoClade.terminal ? zoomIntoClade.parent : zoomIntoClade;
+    this.zoomNode = zoomIntoClade.n.hasChildren ?
+      zoomIntoClade :
+      zoomIntoClade.n.parent.shell;
     applyToChildren(this.zoomNode, (d) => {d.inView = true;});
   }
-  if (svgHasChangedDimensions) {
+  if (svgHasChangedDimensions || changeNodeOrder) {
     this.nodes.forEach((d) => {d.update = true;});
   }
 
@@ -345,17 +360,23 @@ export const change = function change({
   /* distance */
   if (newDistance || updateLayout) this.setDistance(newDistance);
   /* layout (must run after distance) */
-  if (newDistance || newLayout || updateLayout) {
+  if (newDistance || newLayout || updateLayout || changeNodeOrder) {
     this.setLayout(newLayout || this.layout, scatterVariables);
   }
   /* show confidences - set this param which actually adds the svg paths for
      confidence intervals when mapToScreen() gets called below */
   if (showConfidences) this.params.confidence = true;
+  /* keep the state of phylotree in sync with redux (more complex than it should be) */
+  if (showAllBranchLabels!==undefined) {
+    this.params.showAllBranchLabels=showAllBranchLabels;
+    elemsToUpdate.add('.branchLabel');
+  }
   /* mapToScreen */
   if (
     svgPropsToUpdate.has(["stroke-width"]) ||
     newDistance ||
     newLayout ||
+    changeNodeOrder ||
     updateLayout ||
     zoomIntoClade ||
     svgHasChangedDimensions ||
@@ -369,10 +390,9 @@ export const change = function change({
     elemsToUpdate.add('.tipLabel'); /* will trigger d3 commands as required */
   }
 
-  /* Finally, actually change the SVG elements themselves */
   const extras = { removeConfidences, showConfidences, newBranchLabellingKey };
   extras.timeSliceHasPotentiallyChanged = changeVisibility || newDistance;
-  extras.hideTipLabels = animationInProgress;
+  extras.hideTipLabels = animationInProgress || newTipLabelKey === 'none';
   if (useModifySVGInStages) {
     this.modifySVGInStages(elemsToUpdate, svgPropsToUpdate, transitionTime, 1000, extras);
   } else {

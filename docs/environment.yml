@@ -7,6 +7,8 @@ dependencies:
   - sphinx
   - pip
   - pip:
-    - nextstrain-sphinx-theme>=2020.2
+    - nextstrain-sphinx-theme>=2022.5
+    - sphinx-autobuild
     - sphinx-markdown-tables
     - sphinx-argparse
+    - pygments>=2.12.0  # For JSON with comments

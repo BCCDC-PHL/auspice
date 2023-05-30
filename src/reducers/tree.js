@@ -1,4 +1,5 @@
 import { countTraitsAcrossTree } from "../util/treeCountingHelpers";
+import { addNodeAttrs } from "../util/treeMiscHelpers";
 import * as types from "../actions/types";
 
 /* A version increase (i.e. props.version !== nextProps.version) necessarily implies
@@ -22,6 +23,7 @@ export const getDefaultTreeState = () => {
     idxOfInViewRootNode: 0,
     visibleStateCounts: {},
     totalStateCounts: {},
+    observedMutations: {},
     availableBranchLabels: [],
     selectedStrain: undefined,
     selectedClade: undefined
@@ -38,8 +40,9 @@ const Tree = (state = getDefaultTreeState(), action) => {
       return Object.assign({}, state, {
         loaded: false
       });
-    case types.CHANGE_DATES_VISIBILITY_THICKNESS: /* fall-through */
-    case types.UPDATE_VISIBILITY_AND_BRANCH_THICKNESS:
+    case types.CHANGE_EXPLODE_ATTR: /* fallthrough */
+    case types.CHANGE_DATES_VISIBILITY_THICKNESS: /* fallthrough */
+    case types.UPDATE_VISIBILITY_AND_BRANCH_THICKNESS: {
       const newStates = {
         visibility: action.visibility,
         visibilityVersion: action.visibilityVersion,
@@ -53,6 +56,7 @@ const Tree = (state = getDefaultTreeState(), action) => {
         selectedStrain: action.selectedStrain
       };
       return Object.assign({}, state, newStates);
+    }
     case types.UPDATE_TIP_RADII:
       return Object.assign({}, state, {
         tipRadii: action.data,
@@ -66,15 +70,8 @@ const Tree = (state = getDefaultTreeState(), action) => {
     case types.TREE_TOO_DATA:
       return action.tree;
     case types.ADD_EXTRA_METADATA:
-      // modify the node data in place, which will not trigger any redux updates
-      state.nodes.forEach((node) => {
-        if (action.newNodeAttrs[node.name]) {
-          if (!node.node_attrs) node.node_attrs = {};
-          for (const [attrName, attrData] of Object.entries(action.newNodeAttrs[node.name])) {
-            node.node_attrs[attrName] = attrData;
-          }
-        }
-      });
+      // add data into `nodes` in-place, so no redux update will be triggered if you only listen to `nodes`
+      addNodeAttrs(state.nodes, action.newNodeAttrs);
       // add the new colorings to visibleStateCounts & totalStateCounts so that they can function as filters
       return {
         ...state,

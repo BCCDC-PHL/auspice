@@ -1,5 +1,4 @@
-import { rgb } from "d3-color";
-import { calcBranchStrokeCols } from "../../../util/colorHelpers";
+import { calcBranchStrokeCols, getBrighterColor } from "../../../util/colorHelpers";
 
 export const changePhyloTreeViaPropsComparison = (mainTree, phylotree, oldProps, newProps) => {
   const args = {};
@@ -12,11 +11,10 @@ export const changePhyloTreeViaPropsComparison = (mainTree, phylotree, oldProps,
   Note that updating properties itself won't trigger any visual changes */
   phylotree.dateRange = [newProps.dateMinNumeric, newProps.dateMaxNumeric];
 
-  /* catch selectedStrain dissapearence seperately to visibility and remove modal */
+  /* catch selectedStrain disappearance separately to visibility and remove modal */
   if (oldTreeRedux.selectedStrain && !newTreeRedux.selectedStrain) {
     /* TODO change back the tip radius */
-    newState.selectedTip = null;
-    newState.hovered = null;
+    newState.selectedNode = {};
   }
   /* colorBy change? */
   if (!!newTreeRedux.nodeColorsVersion &&
@@ -25,7 +23,7 @@ export const changePhyloTreeViaPropsComparison = (mainTree, phylotree, oldProps,
     args.changeColorBy = true;
     args.branchStroke = calcBranchStrokeCols(newTreeRedux, newProps.colorByConfidence, newProps.colorBy);
     args.tipStroke = newTreeRedux.nodeColors;
-    args.fill = newTreeRedux.nodeColors.map((col) => rgb(col).brighter([0.65]).toString());
+    args.fill = newTreeRedux.nodeColors.map(getBrighterColor);
   }
 
   /* visibility */
@@ -51,6 +49,11 @@ export const changePhyloTreeViaPropsComparison = (mainTree, phylotree, oldProps,
     args.newDistance = newProps.distanceMeasure;
   }
 
+  /* explode! */
+  if (oldProps.explodeAttr !== newProps.explodeAttr) {
+    args.changeNodeOrder = true;
+  }
+
   /* change in key used to define branch labels, tip labels */
   if (oldProps.canRenderBranchLabels===true && newProps.canRenderBranchLabels===false) {
     args.newBranchLabellingKey = "none";
@@ -61,6 +64,10 @@ export const changePhyloTreeViaPropsComparison = (mainTree, phylotree, oldProps,
   ) {
     args.newBranchLabellingKey = newProps.selectedBranchLabel;
   }
+  if (oldProps.showAllBranchLabels!==newProps.showAllBranchLabels) {
+    args.showAllBranchLabels = newProps.showAllBranchLabels;
+  }
+
   if (oldProps.tipLabelKey !== newProps.tipLabelKey) {
     args.newTipLabelKey = newProps.tipLabelKey;
   }
@@ -88,9 +95,7 @@ export const changePhyloTreeViaPropsComparison = (mainTree, phylotree, oldProps,
   if (oldTreeRedux.idxOfInViewRootNode !== newTreeRedux.idxOfInViewRootNode) {
     const rootNode = phylotree.nodes[newTreeRedux.idxOfInViewRootNode];
     args.zoomIntoClade = rootNode;
-    newState.selectedBranch = newTreeRedux.idxOfInViewRootNode === 0 ? null : rootNode;
-    newState.selectedTip = null;
-    newState.hovered = null;
+    newState.selectedNode = {};
     if (newProps.layout === "unrooted") {
       args.updateLayout = true;
     }

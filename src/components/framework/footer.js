@@ -1,7 +1,9 @@
 import React, { Suspense, lazy } from "react";
 import { connect } from "react-redux";
 import styled from 'styled-components';
+import Collapsible from "react-collapsible";
 import { withTranslation } from "react-i18next";
+import {FaAngleUp, FaAngleDown} from "react-icons/fa";
 import { dataFont } from "../../globalStyles";
 import Flex from "./flex";
 import { applyFilter } from "../../actions/tree";
@@ -21,6 +23,14 @@ const FooterStyles = styled.div`
   line-height: 1.4;
 
   p {
+    font-weight: 300;
+  }
+
+  ol {
+    font-weight: 300;
+  }
+
+  ul {
     font-weight: 300;
   }
 
@@ -92,8 +102,8 @@ const FooterStyles = styled.div`
   }
 
   .line {
-    margin-top: 20px;
-    margin-bottom: 20px;
+    margin-top: 15px;
+    margin-bottom: 15px;
     border-bottom: 1px solid #CCC;
   }
 
@@ -120,12 +130,34 @@ const FooterStyles = styled.div`
     margin-bottom: 2px;
   }
 
+  table {
+    font-weight: 300;
+    margin-bottom: 1rem;
+
+    th,
+    td {
+      text-align: left;
+      padding: 0.45rem;
+      vertical-align: top;
+      border-top: 1px solid #dee2e6;
+    }
+
+    thead th {
+      vertical-align: bottom;
+      border-bottom: 2px solid #dee2e6;
+    }
+
+    tbody + tbody {
+      border-top: 2px solid #dee2e6;
+    }
+  }
+
 `;
 
 export const getAcknowledgments = (metadata, dispatch) => {
   /**
-   * If the metadata contains a description key, then it will take precendence the hard-coded
-   * acknowledgements. Expects the text in the description to be in Mardown format.
+   * If the metadata contains a description key, then it will take precedence the hard-coded
+   * acknowledgements. Expects the text in the description to be in Markdown format.
    * Jover. December 2019.
   */
   if (metadata.description) {
@@ -163,6 +195,24 @@ const removeFiltersButton = (dispatch, filterNames, outerClassName, label) => (
   </SimpleFilter>
 );
 
+const TitleContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin: 0px;
+  padding: 0px;
+`;
+const IconContainer = styled.span`
+  font-size: 22px;
+  font-weight: 500;
+`;
+
+const CollapseTitle = ({name, isExpanded=false}) => (
+  <TitleContainer>
+    {name}
+    <IconContainer>{isExpanded ? <FaAngleUp /> : <FaAngleDown />}</IconContainer>
+  </TitleContainer>
+);
+
 
 @connect((state) => {
   return {
@@ -197,30 +247,39 @@ class Footer extends React.Component {
     const totalStateCount = this.props.totalStateCounts[filterName];
     const filterTitle = this.props.metadata.colorings[filterName] ? this.props.metadata.colorings[filterName].title : filterName;
     const activeFilterItems = this.props.activeFilters[filterName].filter((x) => x.active).map((x) => x.value);
+    const title = (<div>
+      {t("Filter by {{filterTitle}}", {filterTitle: filterTitle}) + ` (n=${totalStateCount.size})`}
+      {this.props.activeFilters[filterName].length ? removeFiltersButton(this.props.dispatch, [filterName], "inlineRight", t("Clear {{filterName}} filter", { filterName: filterName})) : null}
+    </div>);
     return (
       <div>
-        {t("Filter by {{filterTitle}}", {filterTitle: filterTitle})}
-        {this.props.activeFilters[filterName].length ? removeFiltersButton(this.props.dispatch, [filterName], "inlineRight", t("Clear {{filterName}} filter", { filterName: filterName})) : null}
-        <div className='filterList'>
-          <Flex wrap="wrap" justifyContent="flex-start" alignItems="center">
-            {
-              Array.from(totalStateCount.keys())
-                .filter((itemName) => isValueValid(itemName)) // remove invalid values present across the tree
-                .sort() // filters are sorted alphabetically
-                .map((itemName) => (
-                  <SimpleFilter
-                    key={itemName}
-                    active={activeFilterItems.indexOf(itemName) !== -1}
-                    onClick={() => dispatchFilter(this.props.dispatch, this.props.activeFilters, filterName, itemName)}
-                  >
-                    <span>
-                      {`${itemName} (${totalStateCount.get(itemName)})`}
-                    </span>
-                  </SimpleFilter>
-                ))
-            }
-          </Flex>
-        </div>
+        <Collapsible
+          triggerWhenOpen={<CollapseTitle name={title} isExpanded />}
+          trigger={<CollapseTitle name={title} />}
+          triggerStyle={{cursor: "pointer", textDecoration: "none"}}
+          transitionTime={100}
+        >
+          <div className='filterList'>
+            <Flex wrap="wrap" justifyContent="flex-start" alignItems="center">
+              {
+                Array.from(totalStateCount.keys())
+                  .filter((itemName) => isValueValid(itemName)) // remove invalid values present across the tree
+                  .sort() // filters are sorted alphabetically
+                  .map((itemName) => (
+                    <SimpleFilter
+                      key={itemName}
+                      active={activeFilterItems.indexOf(itemName) !== -1}
+                      onClick={() => dispatchFilter(this.props.dispatch, this.props.activeFilters, filterName, itemName)}
+                    >
+                      <span>
+                        {`${itemName} (${totalStateCount.get(itemName)})`}
+                      </span>
+                    </SimpleFilter>
+                  ))
+              }
+            </Flex>
+          </div>
+        </Collapsible>
       </div>
     );
   }

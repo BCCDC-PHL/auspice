@@ -2,9 +2,9 @@
 
 # VARIABLES
 read -r -d '' purposeMsg <<'EOF'
-Bumping Auspice version & deploying to Heroku
+Releasing a new Auspice version
 
-This script attempts to do 9 things. It will exit if any steps fail...
+This script attempts to do 10 things. It will exit if any steps fail...
 (1) checkout master & ensure it is up to date with github
 (2) increment Version number (in `src/version.js` and `package.json`) by prompting the user
 (3) add a title with the version number to the CHANGELOG
@@ -12,8 +12,9 @@ This script attempts to do 9 things. It will exit if any steps fail...
 (5) checkout `release` branch from github (will fail if it exists locally)
 (6) merge master -> release
 (7) tag release with new version
-(8) push release branch to github (this triggers Travis CI to build, upload and trigger Heroku deploy)
+(8) push release branch to github (this triggers GitHub Actions CI to build and publish to npm)
 (9) checkout `master` and remove local `release` branch
+(10) Create a GitHub Release
 
 EOF
 
@@ -37,6 +38,9 @@ if git rev-parse --verify --quiet release
     echo "release branch already exists locally - fatal"
     exit 2
 fi
+
+# exit early if user is not authenticated with the GitHub CLI (or doesn't have it)
+gh auth status
 
 # step 1: check master is up to date with github
 step="1"
@@ -66,14 +70,14 @@ select yn in "major-new-release" "feature-release" "minor-fix"; do
     esac
 done
 echo -e "\n"
-# now replace the version in packages.json and version.js (inplace!)
-perl -pi -e "s/\"version\": \"${packagesVersion}\"/\"version\": \"${newVersion}\"/" package.json
+# now replace the version in NPM files and version.js (inplace!)
+npm version "${newVersion}" --no-git-tag-version
 perl -pi -e "s/version = \"${srcVersion}\";/version = \"${newVersion}\";/" src/version.js
 unset packagesVersion srcVersion parts bumps yn
 
-# step 3: add h2 title to CHANGELOG.md with newVersion & date, while preserving YAML frontmatter for docs
+# step 3: add h2 title to CHANGELOG.md with newVersion & date, while preserving the h1 title
 today=$(date +'%Y/%m/%d')
-echo -e "---\ntitle: Changelog\n---\n\n## version ${newVersion} - ${today}\n\n$(tail -n +4 CHANGELOG.md)" > CHANGELOG.md
+echo -e "# Changelog\n\n## version ${newVersion} - ${today}\n\n$(tail -n +2 CHANGELOG.md)" > CHANGELOG.md
 unset today
 
 # step 4: commit to current branch (master) & push to github (origin)
@@ -99,9 +103,14 @@ git tag -a v${newVersion} -m "${msg}"
 step="8"
 git push --follow-tags origin release
 
-# step 10: go back to master & delete release branch (locally)
+# step 9: go back to master & delete release branch (locally)
 step="9"
 git checkout master
 git branch -d release
 
-echo -e "\nScript completed. $msg (version ${newVersion}) pushed to github:release and github:master\n"
+echo -e "\n$msg (version ${newVersion}) pushed to github:release and github:master"
+echo -e "\nThe 'CI' GitHub Action will automatically publish this version to npm"
+echo -e "\nNow attempting to make a GitHub release (https://github.com/nextstrain/auspice/releases). If this step fails please do this manually."
+
+# Step 10: create a release based off the tag with content from the changlog
+node scripts/extract-release-notes.js | gh release create v${newVersion} --repo nextstrain/auspice -t "Auspice ${newVersion}" --notes-file -
