@@ -308,7 +308,7 @@ export const straindivTSV = (dispatch, filePrefix, nodes, colorings, nodeVisibil
     if (accession) {
       const traitName = "Accession";
       if (!headerFields.includes(traitName)) headerFields.push(traitName);
-      tipTraitValues[node.name][traitName] = accession;
+      tipTraitValues[node.name][traitName] = accession.accession;
     }
 
   }
