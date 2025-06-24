@@ -1,0 +1,543 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "compression-webpack-plugin": {
+      "name": "compression-webpack-plugin",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "serialize-javascript"
+      ],
+      "effects": [],
+      "range": "1.1.0 - 3.1.0",
+      "nodes": [
+        "node_modules/compression-webpack-plugin"
+      ],
+      "fixAvailable": {
+        "name": "compression-webpack-plugin",
+        "version": "11.1.0",
+        "isSemVerMajor": true
+      }
+    },
+    "css-loader": {
+      "name": "css-loader",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "icss-utils",
+        "postcss",
+        "postcss-modules-extract-imports",
+        "postcss-modules-local-by-default",
+        "postcss-modules-scope",
+        "postcss-modules-values"
+      ],
+      "effects": [],
+      "range": "0.15.0 - 4.3.0",
+      "nodes": [
+        "node_modules/css-loader"
+      ],
+      "fixAvailable": {
+        "name": "css-loader",
+        "version": "7.1.2",
+        "isSemVerMajor": true
+      }
+    },
+    "d3-brush": {
+      "name": "d3-brush",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "d3-interpolate",
+        "d3-transition"
+      ],
+      "effects": [],
+      "range": "0.1.0 - 2.1.0",
+      "nodes": [
+        "node_modules/d3-brush"
+      ],
+      "fixAvailable": {
+        "name": "d3-brush",
+        "version": "3.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "d3-color": {
+      "name": "d3-color",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1088594,
+          "name": "d3-color",
+          "dependency": "d3-color",
+          "title": "d3-color vulnerable to ReDoS",
+          "url": "https://github.com/advisories/GHSA-36jr-mh4h-2g58",
+          "severity": "high",
+          "cwe": [
+            "CWE-400"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<3.1.0"
+        }
+      ],
+      "effects": [
+        "d3-interpolate",
+        "d3-scale",
+        "d3-transition"
+      ],
+      "range": "<3.1.0",
+      "nodes": [
+        "node_modules/d3-color"
+      ],
+      "fixAvailable": {
+        "name": "d3-color",
+        "version": "3.1.0",
+        "isSemVerMajor": true
+      }
+    },
+    "d3-interpolate": {
+      "name": "d3-interpolate",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "d3-color"
+      ],
+      "effects": [
+        "d3-brush",
+        "d3-scale",
+        "d3-transition",
+        "d3-zoom"
+      ],
+      "range": "0.1.3 - 2.0.1",
+      "nodes": [
+        "node_modules/d3-interpolate"
+      ],
+      "fixAvailable": {
+        "name": "d3-interpolate",
+        "version": "3.0.1",
+        "isSemVerMajor": true
+      }
+    },
+    "d3-scale": {
+      "name": "d3-scale",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "d3-color",
+        "d3-interpolate"
+      ],
+      "effects": [],
+      "range": "0.1.3 - 3.3.0",
+      "nodes": [
+        "node_modules/d3-scale"
+      ],
+      "fixAvailable": {
+        "name": "d3-scale",
+        "version": "4.0.2",
+        "isSemVerMajor": true
+      }
+    },
+    "d3-transition": {
+      "name": "d3-transition",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "d3-color",
+        "d3-interpolate"
+      ],
+      "effects": [],
+      "range": "0.0.7 - 2.0.0",
+      "nodes": [
+        "node_modules/d3-transition"
+      ],
+      "fixAvailable": {
+        "name": "d3-transition",
+        "version": "3.0.1",
+        "isSemVerMajor": true
+      }
+    },
+    "d3-zoom": {
+      "name": "d3-zoom",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "d3-interpolate",
+        "d3-transition"
+      ],
+      "effects": [],
+      "range": "0.0.2 - 2.0.0",
+      "nodes": [
+        "node_modules/d3-zoom"
+      ],
+      "fixAvailable": {
+        "name": "d3-zoom",
+        "version": "3.0.0",
+        "isSemVerMajor": true
+      }
+    },
+    "dompurify": {
+      "name": "dompurify",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1102259,
+          "name": "dompurify",
+          "dependency": "dompurify",
+          "title": "DOMPurify allows Cross-site Scripting (XSS)",
+          "url": "https://github.com/advisories/GHSA-vhxf-7vqr-mrjg",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-79"
+          ],
+          "cvss": {
+            "score": 4.5,
+            "vectorString": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:C/C:L/I:L/A:N"
+          },
+          "range": "<3.2.4"
+        }
+      ],
+      "effects": [],
+      "range": "<3.2.4",
+      "nodes": [
+        "node_modules/dompurify"
+      ],
+      "fixAvailable": {
+        "name": "dompurify",
+        "version": "3.2.6",
+        "isSemVerMajor": true
+      }
+    },
+    "ejs": {
+      "name": "ejs",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1089270,
+          "name": "ejs",
+          "dependency": "ejs",
+          "title": "ejs template injection vulnerability",
+          "url": "https://github.com/advisories/GHSA-phwq-j96m-2c2q",
+          "severity": "critical",
+          "cwe": [
+            "CWE-74"
+          ],
+          "cvss": {
+            "score": 9.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": "<3.1.7"
+        },
+        {
+          "source": 1098366,
+          "name": "ejs",
+          "dependency": "ejs",
+          "title": "ejs lacks certain pollution protection",
+          "url": "https://github.com/advisories/GHSA-ghr5-ch3p-vcr6",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-693",
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 4,
+            "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<3.1.10"
+        }
+      ],
+      "effects": [
+        "webpack-bundle-analyzer"
+      ],
+      "range": "<=3.1.9",
+      "nodes": [
+        "node_modules/ejs"
+      ],
+      "fixAvailable": {
+        "name": "webpack-bundle-analyzer",
+        "version": "4.10.2",
+        "isSemVerMajor": true
+      }
+    },
+    "icss-utils": {
+      "name": "icss-utils",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "postcss"
+      ],
+      "effects": [
+        "css-loader",
+        "postcss-modules-local-by-default",
+        "postcss-modules-values"
+      ],
+      "range": "<=4.1.1",
+      "nodes": [
+        "node_modules/icss-utils"
+      ],
+      "fixAvailable": {
+        "name": "css-loader",
+        "version": "7.1.2",
+        "isSemVerMajor": true
+      }
+    },
+    "postcss": {
+      "name": "postcss",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1094544,
+          "name": "postcss",
+          "dependency": "postcss",
+          "title": "PostCSS line return parsing error",
+          "url": "https://github.com/advisories/GHSA-7fh5-64p2-3v2j",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-74",
+            "CWE-144"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+          },
+          "range": "<8.4.31"
+        }
+      ],
+      "effects": [
+        "css-loader",
+        "icss-utils",
+        "postcss-modules-extract-imports",
+        "postcss-modules-local-by-default",
+        "postcss-modules-scope",
+        "postcss-modules-values"
+      ],
+      "range": "<8.4.31",
+      "nodes": [
+        "node_modules/postcss"
+      ],
+      "fixAvailable": {
+        "name": "css-loader",
+        "version": "7.1.2",
+        "isSemVerMajor": true
+      }
+    },
+    "postcss-modules-extract-imports": {
+      "name": "postcss-modules-extract-imports",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "postcss"
+      ],
+      "effects": [],
+      "range": "<=2.0.0",
+      "nodes": [
+        "node_modules/postcss-modules-extract-imports"
+      ],
+      "fixAvailable": true
+    },
+    "postcss-modules-local-by-default": {
+      "name": "postcss-modules-local-by-default",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "icss-utils",
+        "postcss"
+      ],
+      "effects": [],
+      "range": "<=4.0.0-rc.4",
+      "nodes": [
+        "node_modules/postcss-modules-local-by-default"
+      ],
+      "fixAvailable": true
+    },
+    "postcss-modules-scope": {
+      "name": "postcss-modules-scope",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "postcss"
+      ],
+      "effects": [],
+      "range": "<=2.2.0",
+      "nodes": [
+        "node_modules/postcss-modules-scope"
+      ],
+      "fixAvailable": true
+    },
+    "postcss-modules-values": {
+      "name": "postcss-modules-values",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "icss-utils",
+        "postcss"
+      ],
+      "effects": [
+        "css-loader"
+      ],
+      "range": "<=4.0.0-rc.5",
+      "nodes": [
+        "node_modules/postcss-modules-values"
+      ],
+      "fixAvailable": {
+        "name": "css-loader",
+        "version": "7.1.2",
+        "isSemVerMajor": true
+      }
+    },
+    "serialize-javascript": {
+      "name": "serialize-javascript",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1095131,
+          "name": "serialize-javascript",
+          "dependency": "serialize-javascript",
+          "title": "Insecure serialization leading to RCE in serialize-javascript",
+          "url": "https://github.com/advisories/GHSA-hxcc-f52p-wc94",
+          "severity": "high",
+          "cwe": [
+            "CWE-502"
+          ],
+          "cvss": {
+            "score": 8.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": "<3.1.0"
+        }
+      ],
+      "effects": [
+        "compression-webpack-plugin"
+      ],
+      "range": "<3.1.0",
+      "nodes": [
+        "node_modules/serialize-javascript"
+      ],
+      "fixAvailable": {
+        "name": "compression-webpack-plugin",
+        "version": "11.1.0",
+        "isSemVerMajor": true
+      }
+    },
+    "webpack-bundle-analyzer": {
+      "name": "webpack-bundle-analyzer",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        "ejs"
+      ],
+      "effects": [],
+      "range": "1.3.0 - 3.9.0",
+      "nodes": [
+        "node_modules/webpack-bundle-analyzer"
+      ],
+      "fixAvailable": {
+        "name": "webpack-bundle-analyzer",
+        "version": "4.10.2",
+        "isSemVerMajor": true
+      }
+    },
+    "webpack-dev-middleware": {
+      "name": "webpack-dev-middleware",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1096729,
+          "name": "webpack-dev-middleware",
+          "dependency": "webpack-dev-middleware",
+          "title": "Path traversal in webpack-dev-middleware",
+          "url": "https://github.com/advisories/GHSA-wr3j-pwj9-hqq6",
+          "severity": "high",
+          "cwe": [
+            "CWE-22"
+          ],
+          "cvss": {
+            "score": 7.4,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:N/A:N"
+          },
+          "range": "<=5.3.3"
+        }
+      ],
+      "effects": [],
+      "range": "<=5.3.3",
+      "nodes": [
+        "node_modules/webpack-dev-middleware"
+      ],
+      "fixAvailable": {
+        "name": "webpack-dev-middleware",
+        "version": "7.4.2",
+        "isSemVerMajor": true
+      }
+    },
+    "xlsx": {
+      "name": "xlsx",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1094599,
+          "name": "xlsx",
+          "dependency": "xlsx",
+          "title": "Prototype Pollution in sheetJS",
+          "url": "https://github.com/advisories/GHSA-4r6h-8v6p-xvw6",
+          "severity": "high",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 7.8,
+            "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H"
+          },
+          "range": "<0.19.3"
+        },
+        {
+          "source": 1096911,
+          "name": "xlsx",
+          "dependency": "xlsx",
+          "title": "SheetJS Regular Expression Denial of Service (ReDoS)",
+          "url": "https://github.com/advisories/GHSA-5pgg-2g8v-p4x9",
+          "severity": "high",
+          "cwe": [
+            "CWE-1333"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<0.20.2"
+        }
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/xlsx"
+      ],
+      "fixAvailable": false
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 8,
+      "high": 10,
+      "critical": 2,
+      "total": 20
+    },
+    "dependencies": {
+      "prod": 824,
+      "dev": 465,
+      "optional": 1,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 1288
+    }
+  }
+}
