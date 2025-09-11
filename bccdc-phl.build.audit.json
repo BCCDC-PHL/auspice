@@ -184,7 +184,7 @@
       "isDirect": true,
       "via": [
         {
-          "source": 1102259,
+          "source": 1105772,
           "name": "dompurify",
           "dependency": "dompurify",
           "title": "DOMPurify allows Cross-site Scripting (XSS)",
@@ -208,58 +208,6 @@
       "fixAvailable": {
         "name": "dompurify",
         "version": "3.2.6",
-        "isSemVerMajor": true
-      }
-    },
-    "ejs": {
-      "name": "ejs",
-      "severity": "critical",
-      "isDirect": false,
-      "via": [
-        {
-          "source": 1089270,
-          "name": "ejs",
-          "dependency": "ejs",
-          "title": "ejs template injection vulnerability",
-          "url": "https://github.com/advisories/GHSA-phwq-j96m-2c2q",
-          "severity": "critical",
-          "cwe": [
-            "CWE-74"
-          ],
-          "cvss": {
-            "score": 9.8,
-            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
-          },
-          "range": "<3.1.7"
-        },
-        {
-          "source": 1098366,
-          "name": "ejs",
-          "dependency": "ejs",
-          "title": "ejs lacks certain pollution protection",
-          "url": "https://github.com/advisories/GHSA-ghr5-ch3p-vcr6",
-          "severity": "moderate",
-          "cwe": [
-            "CWE-693",
-            "CWE-1321"
-          ],
-          "cvss": {
-            "score": 4,
-            "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
-          },
-          "range": "<3.1.10"
-        }
-      ],
-      "effects": [
-        "webpack-bundle-analyzer"
-      ],
-      "range": "<=3.1.9",
-      "nodes": [
-        "node_modules/ejs"
-      ],
-      "fixAvailable": {
-        "name": "webpack-bundle-analyzer",
-        "version": "4.10.2",
         "isSemVerMajor": true
       }
     },
@@ -425,24 +373,6 @@
         "isSemVerMajor": true
       }
     },
-    "webpack-bundle-analyzer": {
-      "name": "webpack-bundle-analyzer",
-      "severity": "critical",
-      "isDirect": true,
-      "via": [
-        "ejs"
-      ],
-      "effects": [],
-      "range": "1.3.0 - 3.9.0",
-      "nodes": [
-        "node_modules/webpack-bundle-analyzer"
-      ],
-      "fixAvailable": {
-        "name": "webpack-bundle-analyzer",
-        "version": "4.10.2",
-        "isSemVerMajor": true
-      }
-    },
     "webpack-dev-middleware": {
       "name": "webpack-dev-middleware",
       "severity": "high",
@@ -472,7 +402,7 @@
       ],
       "fixAvailable": {
         "name": "webpack-dev-middleware",
-        "version": "7.4.2",
+        "version": "7.4.3",
         "isSemVerMajor": true
       }
     },
@@ -528,16 +458,16 @@
       "low": 0,
       "moderate": 8,
       "high": 10,
-      "critical": 2,
-      "total": 20
+      "critical": 0,
+      "total": 18
     },
     "dependencies": {
-      "prod": 824,
-      "dev": 465,
+      "prod": 822,
+      "dev": 544,
       "optional": 1,
       "peer": 0,
       "peerOptional": 0,
-      "total": 1288
+      "total": 1365
     }
   }
 }
