@@ -2,7 +2,7 @@
 import { unparse } from "papaparse";
 import { errorNotification, infoNotification, warningNotification } from "../../actions/notifications";
 import { spaceBetweenTrees } from "../tree/tree";
-import { getTraitFromNode, getDivFromNode, getFullAuthorInfoFromNode, getVaccineFromNode, getAccessionFromNode } from "../../util/treeMiscHelpers";
+import { getTraitFromNode, getUrlFromNode, getDivFromNode, getFullAuthorInfoFromNode, getVaccineFromNode, getAccessionFromNode } from "../../util/treeMiscHelpers";
 import { numericToCalendar } from "../../util/dateHelpers";
 import { NODE_VISIBLE, nucleotide_gene } from "../../util/globals";
 import { datasetSummary } from "../info/datasetSummary";
@@ -235,7 +235,7 @@ export const strainTSV = (dispatch, filePrefix, nodes, nodeVisibilities) => {
     const numDate = getTraitFromNode(node, "num_date");
     if (numDate) {
       const traitName = "date"; // matches use in augur metadata.tsv
-      if (!headerFields.includes(traitName)) headerFields.push(traitName);
+      headerInsert(headerFields, null, traitName)
       const numDateConfidence = getTraitFromNode(node, "num_date", {confidence: true});
       if (numDateConfidence && numDateConfidence[0] !== numDateConfidence[1]) {
         tipTraitValues[node.name][traitName] = `${numericToCalendar(numDate)} (${numericToCalendar(numDateConfidence[0])} - ${numericToCalendar(numDateConfidence[1])})`;
@@ -249,11 +249,16 @@ export const strainTSV = (dispatch, filePrefix, nodes, nodeVisibilities) => {
     const nodeAttrsToIgnore = ["author", "div", "num_date", "vaccine", "accession"];
     const traits = Object.keys(node.node_attrs).filter((k) => !nodeAttrsToIgnore.includes(k));
     for (const trait of traits) {
-      if (!headerFields.includes(trait)) headerFields.push(trait);
       const value = getTraitFromNode(node, trait);
-      if (value) {
+      if (value !== undefined) {
+        headerInsert(headerFields, null, trait);
         if (typeof value === 'string') {
           tipTraitValues[node.name][trait] = value;
+          const url = getUrlFromNode(node, trait);
+          if (url) {
+            headerInsert(headerFields, trait, urlify(trait));
+            tipTraitValues[node.name][urlify(trait)] = url;
+          }
         } else if (typeof value === "number") {
           tipTraitValues[node.name][trait] = parseFloat(value).toFixed(2);
         }
@@ -264,10 +269,11 @@ export const strainTSV = (dispatch, filePrefix, nodes, nodeVisibilities) => {
     const fullAuthorInfo = getFullAuthorInfoFromNode(node);
     if (fullAuthorInfo) {
       const traitName = "author";
-      if (!headerFields.includes(traitName)) headerFields.push(traitName);
+      headerInsert(headerFields, null, traitName);
       tipTraitValues[node.name][traitName] = fullAuthorInfo.value;
       if (isPaperURLValid(fullAuthorInfo)) {
-        tipTraitValues[node.name][traitName] += ` (${fullAuthorInfo.paper_url})`;
+        headerInsert(headerFields, traitName, urlify(traitName));
+        tipTraitValues[node.name][urlify(traitName)] = fullAuthorInfo.paper_url;
       }
     }
 
@@ -275,16 +281,20 @@ export const strainTSV = (dispatch, filePrefix, nodes, nodeVisibilities) => {
     const vaccine = getVaccineFromNode(node);
     if (vaccine && vaccine.selection_date) {
       const traitName = "vaccine_selection_date";
-      if (!headerFields.includes(traitName)) headerFields.push(traitName);
+      headerInsert(headerFields, null, traitName);
       tipTraitValues[node.name][traitName] = vaccine.selection_date;
     }
 
     /* handle `accession` specially */
     const accession = getAccessionFromNode(node);
-    if ("accession" in accession) {
+    if (accession.accession) {
       const traitName = "accession";
-      if (!headerFields.includes(traitName)) headerFields.push(traitName);
+      headerInsert(headerFields, null, traitName);
       tipTraitValues[node.name][traitName] = accession.accession;
+      if (accession.url) {
+        headerInsert(headerFields, traitName, urlify(traitName));
+        tipTraitValues[node.name][urlify(traitName)] = accession.url;
+      }
     }
   }
 
@@ -327,7 +337,7 @@ export const acknowledgmentsTSV = (dispatch, filePrefix, nodes, nodeVisibilities
     for (const traitName of traitsToExport) {
       const traitValue = getTraitFromNode(node, traitName);
       if (traitValue) {
-        if (!headerFields.includes(traitName)) headerFields.push(traitName);
+        headerInsert(headerFields, null, traitName)
         tipTraitValues[node.name][traitName] = traitValue;
       }
     }
@@ -336,10 +346,11 @@ export const acknowledgmentsTSV = (dispatch, filePrefix, nodes, nodeVisibilities
     const fullAuthorInfo = getFullAuthorInfoFromNode(node);
     if (fullAuthorInfo) {
       const traitName = "author";
-      if (!headerFields.includes(traitName)) headerFields.push(traitName);
+      headerInsert(headerFields, null, traitName)
       tipTraitValues[node.name][traitName] = fullAuthorInfo.value;
       if (isPaperURLValid(fullAuthorInfo)) {
-        tipTraitValues[node.name][traitName] += ` (${fullAuthorInfo.paper_url})`;
+        headerInsert(headerFields, traitName, urlify(traitName));
+        tipTraitValues[node.name][urlify(traitName)] = fullAuthorInfo.paper_url;
       }
     }
 
@@ -350,6 +361,34 @@ export const acknowledgmentsTSV = (dispatch, filePrefix, nodes, nodeVisibilities
   write(filename, MIME.tsv, createTsvString(Object.values(tipTraitValues), headerFields));
   dispatch(infoNotification({message: `Acknowledgments exported to ${filename}`}));
 };
+
+
+/**
+ * Inserts *el2* after *el1* in the provided *arr* array (modified in-place)
+ * if *el1* is `null` then we add *el2* to the end of the array (in-place)
+ * If *el2* is already in the *arr* nothing is done
+ */
+function headerInsert(arr, el1, el2) {
+  if (arr.includes(el2)) return
+  if (el1===null) {
+    arr.push(el2);
+    return
+  }
+  const idx1 = arr.indexOf(el1);
+  if (idx1===-1) {
+    console.warn(`Element ${el1} not present in provided array`)
+    return;
+  }
+  arr.splice(idx1+1, 0, el2);
+}
+
+/**
+ * For a column *name* return the associated column name to use for URLs
+ */
+function urlify(name) {
+  return `${name}__url`;
+}
+
 
 export const exportTree = ({dispatch, filePrefix, tree, isNewick, temporal, colorings, colorBy}) => {
   try {
@@ -401,22 +440,44 @@ const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLines
     panels.tree.width += (spaceBetweenTrees + panels.secondTree.width);
   }
 
-  if (panels.tree && panels.map) {
-    if (panelLayout === "grid") {
-      width = panels.tree.width + padding + panels.map.width;
-      height = Math.max(panels.tree.height, panels.map.height);
-      panels.map.x = panels.tree.width + padding;
+  // Special handling of layout if measurements panel is included
+  // Display as if we are in "full" view to display all filtered measurements
+  if (panels.measurements) {
+    if (panels.tree) {
+      width = Math.max(panels.tree.width, panels.measurements.width);
+      height = panels.tree.height + padding + panels.measurements.height;
+      panels.measurements.y = panels.tree.height + padding;
     } else {
-      width = Math.max(panels.tree.width, panels.map.width);
-      height = panels.tree.height + padding + panels.map.height;
-      panels.map.y = panels.tree.height + padding;
+      width = panels.measurements.width;
+      height = panels.measurements.height;
     }
-  } else if (panels.tree) {
-    width = panels.tree.width;
-    height = panels.tree.height;
-  } else if (panels.map) {
-    width = panels.map.width;
-    height = panels.map.height;
+
+    panels.measurementsXAxis.y = height;
+    height += panels.measurementsXAxis.height;
+
+    if (panels.map) {
+      width = Math.max(width, panels.map.width);
+      panels.map.y = height + padding;
+      height += padding + panels.map.height;
+    }
+  } else {
+    if (panels.tree && panels.map) {
+      if (panelLayout === "grid") {
+        width = panels.tree.width + padding + panels.map.width;
+        height = Math.max(panels.tree.height, panels.map.height);
+        panels.map.x = panels.tree.width + padding;
+      } else {
+        width = Math.max(panels.tree.width, panels.map.width);
+        height = panels.tree.height + padding + panels.map.height;
+        panels.map.y = panels.tree.height + padding;
+      }
+    } else if (panels.tree) {
+      width = panels.tree.width;
+      height = panels.tree.height;
+    } else if (panels.map) {
+      width = panels.map.width;
+      height = panels.map.height;
+    }
   }
 
   if (panels.entropy) {
@@ -499,6 +560,20 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
         errors.push("second tree / tanglegram");
         console.error("Second Tree / tanglegram SVG save error:", e);
       }
+    }
+  }
+  if (panelsInDOM.indexOf("measurements") !== -1) {
+    try {
+      panels.measurements = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("d3MeasurementsSVG")));
+      panels.measurementsXAxis = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("d3MeasurementsXAxisSVG")));
+      // Get the actual width of SVG from the measurements container since the SVG just uses width=100%
+      const measurementsContainer = document.getElementById("measurementsSVGContainer");
+      panels.measurements.width = measurementsContainer.clientWidth;
+      panels.measurementsXAxis.width = measurementsContainer.clientWidth;
+    } catch (e) {
+      panels.measurements = undefined;
+      errors.push("measurements");
+      console.error("Measurements SVG save error:", e);
     }
   }
   if (panelsInDOM.indexOf("entropy") !== -1) {

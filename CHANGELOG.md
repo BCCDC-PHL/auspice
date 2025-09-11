@@ -1,5 +1,34 @@
 # Changelog
 
+## version 2.66.0 - 2025/09/05
+
+
+* Fixed a bug that prevented drag-and-drop metadata files from being parsed that was introduced in version 2.64.0 ([#2007](https://github.com/nextstrain/auspice/pull/2007))
+* Added SVG-download support for the measurements panel. ([#2005](https://github.com/nextstrain/auspice/pull/2005))
+
+## version 2.65.0 - 2025/09/02
+
+
+* "show all branch labels" toggle has been updated to only show labels for visible branches, i.e. branches of selected tips after applying filters ([#2004](https://github.com/nextstrain/auspice/pull/2004))
+
+## version 2.64.0 - 2025/08/15
+
+
+* Link-outs are explicitly disabled for v1 datasets because the nextstrain.org API does not support the v1 -> v2 conversion. ([#2002](https://github.com/nextstrain/auspice/pull/2002))
+* Added a `treeZoom=selected` query to load trees at the same zoom level after the "zoom to selected" button has been pressed, where applicable. See [the view settings docs](https://docs.nextstrain.org/projects/auspice/en/latest/advanced-functionality/view-settings.html) for more details. ([#1321](https://github.com/nextstrain/auspice/pull/1321))
+* Downloaded metadata and acknowledgments TSVs will now use extra columns to export associated URLs. ([#2003](https://github.com/nextstrain/auspice/pull/2003))
+
+**internal changes**
+
+* The JS bundles created when Auspice (client) is built have been changed in various ways ([#1992](https://github.com/nextstrain/auspice/pull/1992)):
+  * Polyfills have been updated and we now only add a subset of polyfills to match our 95% browser target used for JS syntax.
+  * Bundles are now available using Brotli compression (in addition to gzip) and the Auspice server is updated to support them.
+  * Duplicated code has been reduced in the bundles, and the bundle layout has changed.
+  * The map component is separated into a new bundle which should improve load times on datasets which don't use it.
+* Loading spinners have been improved in various ways. ([#1991](https://github.com/nextstrain/auspice/pull/1991))
+* Logos available in the bundle are used rather than a fetch to an external domain. ([#1996](https://github.com/nextstrain/auspice/pull/1996))
+* Added unit tests for `createStateFromQueryOrJSONs`. ([#1988](https://github.com/nextstrain/auspice/pull/1988))
+
 ## version 2.63.1 - 2025/06/04
 
 

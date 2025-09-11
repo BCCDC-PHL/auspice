@@ -5,7 +5,6 @@ import { ThemeProvider } from 'styled-components';
 import SidebarToggle from "../framework/sidebar-toggle";
 import Info from "../info/info";
 import Tree from "../tree";
-import Map from "../map/map";
 import Footer from "../framework/footer";
 import FinePrint from "../framework/fine-print";
 import Modal from "../modal/Modal.jsx";
@@ -20,7 +19,7 @@ import { Sidebar } from "./sidebar";
 import { calcPanelDims, calcStyles } from "./utils";
 import { PanelsContainer, sidebarTheme } from "./styles";
 import ErrorBoundary from "../../util/errorBoundary";
-import Spinner, { PanelSpinner } from "../framework/spinner";
+import { FullPageSpinner, PanelSpinner } from "../framework/spinner";
 import MainDisplayMarkdown from "../narrative/MainDisplayMarkdown";
 import MobileNarrativeDisplay from "../narrative/MobileNarrativeDisplay";
 import PanelErrorBoundary from "../errorBoundaries/panelErrorBoundary";
@@ -28,7 +27,7 @@ import PanelErrorBoundary from "../errorBoundaries/panelErrorBoundary";
 const Entropy = lazy(() => import("../entropy"));
 const Frequencies = lazy(() => import("../frequencies"));
 const Measurements = lazy(() => import("../measurements"));
-
+const Map = lazy(() => import(/* webpackChunkName: "mapComponent" */ "../map/map"));
 
 @connect((state) => ({
   panelsToDisplay: state.controls.panelsToDisplay,
@@ -103,7 +102,7 @@ class Main extends React.Component {
 
   render() {
     if (this.state.showSpinner) {
-      return (<Spinner/>);
+      return (<FullPageSpinner />);
     }
 
     /* for mobile narratives we use a custom component as the nesting of view components is different */
@@ -195,19 +194,29 @@ class Main extends React.Component {
             null
           }
           {this.props.panelsToDisplay.includes("map") ?
-            <PanelErrorBoundary
-              width={this.shouldMapBeInGrid() ? grid.width : full.width}
-              height={this.shouldMapBeInGrid() ? grid.height : full.height}
-              name="map"
+            <Suspense
+              fallback={
+                <PanelSpinner
+                  width={this.inGrid() ? grid.width : full.width}
+                  height={this.inGrid() ? grid.height : full.height}
+                  key={keyName + "_map_spinner"}
+                />
+              }
             >
-              <Map
+              <PanelErrorBoundary
                 width={this.shouldMapBeInGrid() ? grid.width : full.width}
                 height={this.shouldMapBeInGrid() ? grid.height : full.height}
-                key={keyName+"_map"}
-                justGotNewDatasetRenderNewMap={false}
-                legend={this.shouldShowMapLegend()}
-              />
-            </PanelErrorBoundary> :
+                name="map"
+              >
+                <Map
+                  width={this.shouldMapBeInGrid() ? grid.width : full.width}
+                  height={this.shouldMapBeInGrid() ? grid.height : full.height}
+                  key={keyName+"_map"}
+                  justGotNewDatasetRenderNewMap={false}
+                  legend={this.shouldShowMapLegend()}
+                />
+              </PanelErrorBoundary>
+            </Suspense> :
             null
           }
           {this.props.panelsToDisplay.includes("entropy") ?
